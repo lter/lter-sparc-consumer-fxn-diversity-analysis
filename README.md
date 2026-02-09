@@ -1,8 +1,6 @@
 # Consumer Functional Diversity
 
-Principal Investigators:
-
-Shalanda Grier; Lauren Enright; Camille Magneville; Mackenzie White
+Principal Investigators: Shalanda Grier; Lauren Enright; Camille Magneville; Mackenzie White
 
 ## Script Explanations
 
@@ -14,7 +12,8 @@ When you have a group of people collaborating on a shared project (particularly 
 
 ## Related Repositories
 
-- TBD (recommend including user/repository name, link, and brief description)
+- Data harmonization and wrangling repository: [lter / lter-sparc-consumer-fxn-diversity](https://github.com/lter/lter-sparc-consumer-fxn-diversity)
+- Primary analysis repository: [lter / lter-sparc-consumer-fxn-diversity-analysis](https://github.com/lter/lter-sparc-consumer-fxn-diversity-analysis)
 
 ## Supplementary Resources
 
