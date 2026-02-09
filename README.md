@@ -1,7 +1,8 @@
-# GROUP NAME HERE
+# Consumer Functional Diversity
 
 Principal Investigators:
-- PI NAME HERE
+
+Shalanda Grier; Lauren Enright; Camille Magneville; Mackenzie White
 
 ## Script Explanations
 
