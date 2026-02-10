@@ -508,40 +508,40 @@ taxa.df.hulls.t <- taxa.df.t %>%
   group_by(taxa) %>%
   slice(chull(PC1.t, PC2.t))
 
-p2age <- ggplot(taxa.df.t, aes(x = PC1, y = PC2)) +
+p2age.t <- ggplot(taxa.df.t, aes(x = PC1, y = PC2)) +
   geom_point(aes(fill = tr.age.zt, shape = taxa), size = 2) +
   geom_polygon(data = taxa.df.hulls.t, aes(lty = taxa), color = "black", fill = NA) +
   scale_fill_viridis() +
   scale_shape_manual(values = 21:23) +
   theme_bw()
-p2age  
+p2age.t  
 
 
-p2trophic <- ggplot(taxa.df.t, aes(x = PC1, y = PC2)) +
+p2trophic.t <- ggplot(taxa.df.t, aes(x = PC1, y = PC2)) +
   geom_point(aes(fill = tr.trophic.level.zt, shape = taxa), size = 2) +
   geom_polygon(data = taxa.df.hulls.t, aes(lty = taxa), color = "black", fill = NA) +
   scale_fill_viridis() +
   scale_shape_manual(values = 21:23) +
   theme_bw()
-p2trophic
+p2trophic.t
 
 
-p2mass <- ggplot(taxa.df.t, aes(x = PC1, y = PC2)) +
+p2mass.t <- ggplot(taxa.df.t, aes(x = PC1, y = PC2)) +
   geom_point(aes(fill = tr.mass.adult.zt, shape = taxa), size = 2) +
   geom_polygon(data = taxa.df.hulls.t, aes(lty = taxa), color = "black", fill = NA) +
   scale_fill_viridis() +
   scale_shape_manual(values = 21:23) +
   theme_bw()
-p2mass
+p2mass.t
 
 
-p2rep <- ggplot(taxa.df.t, aes(x = PC1, y = PC2)) +
+p2rep.t <- ggplot(taxa.df.t, aes(x = PC1, y = PC2)) +
   geom_point(aes(fill = tr.reproductive.rate.zt, shape = taxa), size = 2) +
   geom_polygon(data = taxa.df.hulls.t, aes(lty = taxa), color = "black", fill = NA) +
   scale_fill_viridis() +
   scale_shape_manual(values = 21:23) +
   theme_bw()
-p2rep
+p2rep.t
 
 p2time <- ggplot(taxa.df.t, aes(x = PC1, y = PC2)) +
   geom_point(aes(color = tr.active.time, shape = taxa), size = 2) +
@@ -551,8 +551,8 @@ p2time <- ggplot(taxa.df.t, aes(x = PC1, y = PC2)) +
 p2time
 
 
-p2s <- p2mass / p2trophic /p2age
-p2s
+p2s.t <- p2mass.t / p2trophic.t /p2age.t
+p2s.t
 
 
 
