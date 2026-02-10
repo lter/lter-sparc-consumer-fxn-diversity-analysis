@@ -168,7 +168,10 @@ sp_tr5 <- sp_tr4 %>%
                                                      tr.fecundity.zp)) %>%
   dplyr::select(-c(tr.reproductive.rate.zp, tr.fecundity.zp))
 
+# Do: tr completion
 # NOTE: I HAVE NAN values: check when they started to show
+# NOTE: can't synchronise to drive
 
-
+saveRDS(sp_tr5, file.path("transformed_data",
+                          "sp_tr_zscore.rds"))
 
