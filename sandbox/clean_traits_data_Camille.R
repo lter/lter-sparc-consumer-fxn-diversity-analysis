@@ -24,7 +24,7 @@ source("00_setup.R")
 rm(list = ls()); gc()
 
 
-# 2 - Load data ================================================================
+# 1 - Load data ================================================================
 
 # Call the new imputed data after download from Drive (ask Shalanda's ok):
 #imp_tr_df <- read.csv(file.path("Data", "traits_tidy-data", "consumer-trait-species-imputed-taxonmic-database.csv"))
@@ -68,7 +68,13 @@ project.taxon$taxa[which(project.taxon$project %in% c("KONZA","PIE","KBS_INS","M
 
 sp_list_ready$taxa <- project.taxon$taxa[match(sp_list_ready$project, project.taxon$project)]
 
-### could clean out those damn octopii. and shit. and other stuff that 'aren't fish'.
+
+
+# 3 - Cleaning non-focal taxa  =========================
+
+
+
+
 
 
 
@@ -158,7 +164,13 @@ all_traits$tr.active.time <- all_traits %>% ungroup() %>%
 # ----
 
 
+
+
+
+
 saveRDS(all_traits1, file.path("transformed_data",  "sp_tr_zscore.rds"))
+
+
 
 
 
@@ -198,7 +210,7 @@ saveRDS(all_traits1, file.path("transformed_data",  "sp_tr_zscore.rds"))
 #         file.path("transformed_data", "proj_taxa_sp_list.rds"))
 # 
 # 
-# # 3 - Clean the traits data and get completedness ==============================
+# 4 - Clean the traits data and get completedness ==============================
 # 
 # 
 # # Keep studied traits, rm non possible values, Homo sapiens and duplicate values
