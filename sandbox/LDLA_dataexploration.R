@@ -200,6 +200,8 @@ rm(list = ls()); gc()
 ##### LOAD DATA #################
 all_traits <- readRDS(file.path("transformed_data", "sp_tr_zscore.rds"))
 
+
+
 # Reduce the project trait dataframe to species with tr data complete:
 all_traits.verts <- all_traits %>% filter(taxa %in% c("Fish","Amphibians","Mammals"))
 
@@ -217,7 +219,7 @@ all_traits.final <- all_traits.verts %>% filter(n_nas < 3)
 onlytraits <- data.frame(all_traits.final %>% ungroup() %>% select(ends_with(".zp"), tr.active.time) %>% mutate(tr.active.time=as.factor(tr.active.time)))
 
 
-rownames(onlytraits) <- all_traits.final$scientific_name
+rownames(onlytraits) <- all_traits.final$sp.proj
 #colnames(onlytraits) <- c("tr.age.zp", "tr.trophic.level.zp", "tr.reproductive.rate.zp", "tr.mass.adult.zp", "tr.active.time" )
 
 onlytraits.nat <- onlytraits %>% select(-tr.active.time)
@@ -334,11 +336,11 @@ fctsp_all
 
 # ----- Reattach metadata to ordination space dataframe ---------
 
-sp.faxes <- data.frame(sp_faxes_coord_all) %>% mutate(scientific.name=rownames(.))
+sp.faxes <- data.frame(sp_faxes_coord_all) %>% mutate(sp.proj=rownames(.))
 all.traits.final.forjoin <- all_traits.final %>% select(-ends_with(".zp"))
 
-taxa.df <- onlytraits.nat %>% mutate(scientific.name = rownames(.)) %>% 
-  left_join(all.traits.final.forjoin, by=c("scientific.name"="scientific_name")) %>%
+taxa.df <- onlytraits.nat %>% mutate(sp.proj = rownames(.)) %>% 
+  left_join(all.traits.final.forjoin, by="sp.proj") %>%
   left_join(sp.faxes)
 
 
@@ -399,7 +401,7 @@ p2s
 
 onlytraits.t <- data.frame(all_traits.final %>% ungroup() %>% select(ends_with(".zt"), tr.active.time) %>% mutate(tr.active.time=as.factor(tr.active.time)))
 
-rownames(onlytraits.t) <- all_traits.final$scientific_name
+rownames(onlytraits.t) <- all_traits.final$sp.proj
 #colnames(onlytraits) <- c("tr.age.zp", "tr.trophic.level.zp", "tr.reproductive.rate.zp", "tr.mass.adult.zp", "tr.active.time" )
 
 onlytraits.nat.t <- onlytraits.t %>% select(-tr.active.time)
@@ -517,7 +519,7 @@ fctsp_all.t
 # rename the taxon-level PCs with '.t'
 colnames(sp_faxes_coord_all.t) <- paste(colnames(sp_faxes_coord_all), "t",sep=".")
 
-sp.faxes.t <- data.frame(sp_faxes_coord_all.t) %>% mutate(scientific.name=rownames(.))
+sp.faxes.t <- data.frame(sp_faxes_coord_all.t) %>% mutate(sp.proj=rownames(.))
 # all.traits.final.forjoin <- all_traits.final %>% select(-ends_with(".zt"))
 
 taxa.df.t <- taxa.df %>%
