@@ -91,9 +91,11 @@ sp_tr1 <- imp_tr_df %>%
 
 # Build one df per Taxa and get traits completedness:
 
+# 
 
 
-# 3 - Create a new reproduction column =========================================
+
+# 3 - Create a new reproduction and size column ================================
 
 # For the two reproduction columns - chose the dominant trait:
 # Fish - fecundity
@@ -126,6 +128,8 @@ sp_tr2 <- sp_tr1 %>%
 # Some species have taxa == NA, insect of species present only in PIE: rm
 sp_tr3 <- sp_tr2 %>% 
   dplyr::filter(! is.na(taxa))
+
+# ADD SIZE COLUMN HERE !!!!!
 
 # Some species are in the list but not in the species traits df
 setdiff(taxa_sp_list_final$scientific_name,
