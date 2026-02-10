@@ -86,7 +86,7 @@ master_sp_list_ready <- bind_rows(master_sp_no_dup, master_sp_remove_dup) #now s
 
 
 # Load imputed traits:
-imp_tr_df <- read.csv(file.path("Data", "traits_tidy-data", "consumer-trait-species-imputed-taxonmic-database_v2.csv"))
+imp_tr_df <- read.csv(file.path("Data", "traits_tidy-data", "consumer-trait-species-imputed-taxonmic-database.csv"))
 
 
 # 2 - Merge traits with program species list ===================================================
