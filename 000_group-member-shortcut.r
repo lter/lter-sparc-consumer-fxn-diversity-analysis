@@ -96,5 +96,14 @@ download_drive_folder(
   folder_url = "https://drive.google.com/drive/folders/1yUg4tYF7F-fuamODUOy55JUg8tmaUyYD",
   local_subfolder = file.path("Data", "environmental_raw-data"))
 
+
+## --------------------------- ##
+# Download Terrestrial Community Raw Data ----
+## --------------------------- ##
+
+download_drive_folder(
+  folder_url = "https://drive.google.com/drive/u/0/folders/1HhVJi_LN7pIgNFYB0uIasnv1GY71BHH-",
+  local_subfolder = file.path("Data", "terrestrial_community_raw-data"))
+
 # End ----
 
