@@ -27,176 +27,181 @@ rm(list = ls()); gc()
 
 
 # 1 - Load data ================================================================
-
-
-# Load master species list for all programs:
-sp_pro_list <- read.csv(file.path("Data", "species_tidy-data", "23_species_master-spp-list.csv"))
-  # has some duplicates
-
-# clean species list to remove duplicates # WILL EVENTUALLY BE REMOVED
-# -----------Species list wrangling start --------
-
-sp_pro_list_v2 <- sp_pro_list %>%
-  dplyr::mutate(across(everything(), na_if, y = ""))
-
-# #Isolate all distinct taxa names, the original master list by project so duplicates across programs with same taxa
-# master_sp_list <- sp_pro_list %>% 
-#   dplyr::select(scientific_name, project) %>%
-#   dplyr::distinct() 
-
-
-sp_pro_list_v2$sp.proj <- paste(sp_pro_list_v2$scientific_name, sp_pro_list_v2$project, sep=".")
-
-sp_pro_list_v3 <- sp_pro_list_v2 %>% distinct(sp.proj, .keep_all = T)
-
-#total_sci_name_duplicates <- sum(duplicated(master_sp_list$scientific_name))
-# #length(unique(master_sp_list$scientific_name)) # 2529 distinct taxa in master species list 
-# 
-# master_sp_list_v2 <- master_sp_list %>%
-#   dplyr::left_join(
-#     sp_pro_list_v2 %>%
-#       dplyr::select(project,habitat,raw_filename,scientific_name, phylum, class, order, family, genus)%>%
-#       dplyr::distinct(),
-#     by = "scientific_name")
 # 
 # 
-# #Check duplicates
-# master_sp_duplicates <- sum(duplicated(master_sp_list_v2$scientific_name))  
-# #scientific_name but have at least one difference in higher order taxonomic level 
+# # Load master species list for all programs:
+# sp_pro_list <- read.csv(file.path("Data", "species_tidy-data", "23_species_master-spp-list.csv"))
+#   # has some duplicates
 # 
-# #Extract duplicates scientific_names 160 unique 
-# master_sp_dup_names <-master_sp_list_v2 %>%
-#   dplyr::group_by(scientific_name) %>%
-#   dplyr::filter(n() > 1) %>%
-#   ungroup()
+# # clean species list to remove duplicates # WILL EVENTUALLY BE REMOVED
+# # -----------Species list wrangling start --------
 # 
-# ##For now will arbitrarily keep the first occurrence but will go back and check correct class names. Also which source?
-# master_sp_remove_dup <- master_sp_dup_names %>%
-#   dplyr::group_by(scientific_name) %>%
-#   dplyr::slice(1) %>% # select first row for each scientific name
-#   dplyr::ungroup() #now 160 obs 
+# sp_pro_list_v2 <- sp_pro_list %>%
+#   dplyr::mutate(across(everything(), na_if, y = ""))
 # 
-# # remove duplicate names from 'master_sp_list_v2' 
-# 
-# master_sp_no_dup <- master_sp_list_v2 %>%
-#   dplyr::anti_join(master_sp_dup_names, 
-#                    by= "scientific_name")
+# # #Isolate all distinct taxa names, the original master list by project so duplicates across programs with same taxa
+# # master_sp_list <- sp_pro_list %>% 
+# #   dplyr::select(scientific_name, project) %>%
+# #   dplyr::distinct() 
 # 
 # 
-# #combine master sp. list with no duplicates with paired down scientific_names 'master_sp_remove_dup'
+# sp_pro_list_v2$sp.proj <- paste(sp_pro_list_v2$scientific_name, sp_pro_list_v2$project, sep=".")
 # 
-# master_sp_list_ready <- bind_rows(master_sp_no_dup, master_sp_remove_dup) #now should have same names as orig. 'master_sp_list'
-
-master_sp_list_ready <- sp_pro_list_v3
-
-
-
-# Load imputed traits:
-imp_tr_df <- read.csv(file.path("Data", "traits_tidy-data", "consumer-trait-species-imputed-taxonmic-database.csv"))
-
-
-# 2 - Merge traits with program species list ===================================================
-
-#Join trait data with program species list 
-program_sp_trt_data <- dplyr::left_join(master_sp_list_ready, imp_tr_df,
-                                        by="scientific_name") %>%
-  dplyr::mutate(
-    order = coalesce(order.x, order.y),
-    family = coalesce(family.x, family.y),
-    genus = coalesce(genus.x, genus.y)) %>%
-  dplyr::select(-ends_with(".x"), -ends_with(".y")) %>%
-  dplyr::relocate(order, family, genus, .before = sex) %>%
-  dplyr::relocate(source, .before = scientific_name) 
-#some source info absent need to fix this later!!! 
-
-program_sp_trt_data$age_life.span_years[which(program_sp_trt_data$age_life.span_years<=0)] <- NA
-
-
-# we're gonna skip PIE (no traits)
-# KBS_INS - insects
-# KONZA - insects
-
-
-
-project.taxon <- data.frame(project = unique(program_sp_trt_data$project))
-
-project.taxon$taxa <- NA
-project.taxon$taxa[which(project.taxon$project %in% c("NGA","Arctic","Palmer","CCE", "NorthLakes"))] <- "Zooplankton"
-project.taxon$taxa[which(project.taxon$project %in% c("CoastalCA","FCE","SBC","MCR","VCR","RLS","FISHGLOB"))] <- "Fish"
-project.taxon$taxa[which(project.taxon$project %in% c("KBS_MAM","SEV","MOHONK_MAM"))] <- "Mammals"
-project.taxon$taxa[which(project.taxon$project %in% c("MOHONK_BIR","KBS_BIR","SBC_BEACH","HARVARD"))] <- "Birds"
-project.taxon$taxa[which(project.taxon$project %in% c("KBS_AMP"))] <- "Amphibians"
-project.taxon$taxa[which(project.taxon$project %in% c("KONZA","PIE","KBS_INS","MOHONK"))] <- "BAD"
-
-# Create a new column for Taxa:
-program_sp_trt_data$taxa <- project.taxon$taxa[match(program_sp_trt_data$project, project.taxon$project)]
-
-# program_sp_trt_data1 <- program_sp_trt_data %>% 
-#   mutate(taxa = case_when(
-#     project == "CoastalCA" ~ "Fish",
-#     project == "FCE" ~ "Fish",
-#     project == "SBC" ~ "Fish",
-#     project == "MCR" ~ "Fish",
-#     project == "VCR" ~ "Fish",
-#     project == "RLS" ~ "Fish",
-#     project == "FISHGLOB" ~ "Fish",
-#     project == "KBS_MAM" ~ "Mammals",
-#     project == "SEV" ~ "Mammals",
-#     project == "MOHONK" ~ "Amphibians",
-#     project == "KBS_AMP" ~ "Amphibians",
-#     project %in% c("HARVARD", "KBS_BIR","SBC_BEACH") ~ "Birds",
-#     project %in% c("NGA","Arctic","Palmer","CCE","NorthLakes") ~ "Zooplankton",
-#     TRUE ~ NA
-#     )) %>% filter(!is.na(taxa), scientific_name!= "Homo sapiens") %>% 
-#   dplyr::mutate(taxa = factor(taxa))
-
-
-# all_traits <- program_sp_trt_data %>% 
+# sp_pro_list_v3 <- sp_pro_list_v2 %>% distinct(sp.proj, .keep_all = T)
+# 
+# #total_sci_name_duplicates <- sum(duplicated(master_sp_list$scientific_name))
+# # #length(unique(master_sp_list$scientific_name)) # 2529 distinct taxa in master species list 
+# # 
+# # master_sp_list_v2 <- master_sp_list %>%
+# #   dplyr::left_join(
+# #     sp_pro_list_v2 %>%
+# #       dplyr::select(project,habitat,raw_filename,scientific_name, phylum, class, order, family, genus)%>%
+# #       dplyr::distinct(),
+# #     by = "scientific_name")
+# # 
+# # 
+# # #Check duplicates
+# # master_sp_duplicates <- sum(duplicated(master_sp_list_v2$scientific_name))  
+# # #scientific_name but have at least one difference in higher order taxonomic level 
+# # 
+# # #Extract duplicates scientific_names 160 unique 
+# # master_sp_dup_names <-master_sp_list_v2 %>%
+# #   dplyr::group_by(scientific_name) %>%
+# #   dplyr::filter(n() > 1) %>%
+# #   ungroup()
+# # 
+# # ##For now will arbitrarily keep the first occurrence but will go back and check correct class names. Also which source?
+# # master_sp_remove_dup <- master_sp_dup_names %>%
+# #   dplyr::group_by(scientific_name) %>%
+# #   dplyr::slice(1) %>% # select first row for each scientific name
+# #   dplyr::ungroup() #now 160 obs 
+# # 
+# # # remove duplicate names from 'master_sp_list_v2' 
+# # 
+# # master_sp_no_dup <- master_sp_list_v2 %>%
+# #   dplyr::anti_join(master_sp_dup_names, 
+# #                    by= "scientific_name")
+# # 
+# # 
+# # #combine master sp. list with no duplicates with paired down scientific_names 'master_sp_remove_dup'
+# # 
+# # master_sp_list_ready <- bind_rows(master_sp_no_dup, master_sp_remove_dup) #now should have same names as orig. 'master_sp_list'
+# 
+# master_sp_list_ready <- sp_pro_list_v3
+# 
+# 
+# 
+# # Load imputed traits:
+# imp_tr_df <- read.csv(file.path("Data", "traits_tidy-data", "consumer-trait-species-imputed-taxonmic-database.csv"))
+# 
+# 
+# # 2 - Merge traits with program species list ===================================================
+# 
+# #Join trait data with program species list 
+# program_sp_trt_data <- dplyr::left_join(master_sp_list_ready, imp_tr_df,
+#                                         by="scientific_name") %>%
+#   dplyr::mutate(
+#     order = coalesce(order.x, order.y),
+#     family = coalesce(family.x, family.y),
+#     genus = coalesce(genus.x, genus.y)) %>%
+#   dplyr::select(-ends_with(".x"), -ends_with(".y")) %>%
+#   dplyr::relocate(order, family, genus, .before = sex) %>%
+#   dplyr::relocate(source, .before = scientific_name) 
+# #some source info absent need to fix this later!!! 
+# 
+# program_sp_trt_data$age_life.span_years[which(program_sp_trt_data$age_life.span_years<=0)] <- NA
+# 
+# 
+# # we're gonna skip PIE (no traits)
+# # KBS_INS - insects
+# # KONZA - insects
+# 
+# 
+# 
+# project.taxon <- data.frame(project = unique(program_sp_trt_data$project))
+# 
+# project.taxon$taxa <- NA
+# project.taxon$taxa[which(project.taxon$project %in% c("NGA","Arctic","Palmer","CCE", "NorthLakes"))] <- "Zooplankton"
+# project.taxon$taxa[which(project.taxon$project %in% c("CoastalCA","FCE","SBC","MCR","VCR","RLS","FISHGLOB"))] <- "Fish"
+# project.taxon$taxa[which(project.taxon$project %in% c("KBS_MAM","SEV","MOHONK_MAM"))] <- "Mammals"
+# project.taxon$taxa[which(project.taxon$project %in% c("MOHONK_BIR","KBS_BIR","SBC_BEACH","HARVARD"))] <- "Birds"
+# project.taxon$taxa[which(project.taxon$project %in% c("KBS_AMP"))] <- "Amphibians"
+# project.taxon$taxa[which(project.taxon$project %in% c("KONZA","PIE","KBS_INS","MOHONK"))] <- "BAD"
+# 
+# # Create a new column for Taxa:
+# program_sp_trt_data$taxa <- project.taxon$taxa[match(program_sp_trt_data$project, project.taxon$project)]
+# 
+# # program_sp_trt_data1 <- program_sp_trt_data %>% 
+# #   mutate(taxa = case_when(
+# #     project == "CoastalCA" ~ "Fish",
+# #     project == "FCE" ~ "Fish",
+# #     project == "SBC" ~ "Fish",
+# #     project == "MCR" ~ "Fish",
+# #     project == "VCR" ~ "Fish",
+# #     project == "RLS" ~ "Fish",
+# #     project == "FISHGLOB" ~ "Fish",
+# #     project == "KBS_MAM" ~ "Mammals",
+# #     project == "SEV" ~ "Mammals",
+# #     project == "MOHONK" ~ "Amphibians",
+# #     project == "KBS_AMP" ~ "Amphibians",
+# #     project %in% c("HARVARD", "KBS_BIR","SBC_BEACH") ~ "Birds",
+# #     project %in% c("NGA","Arctic","Palmer","CCE","NorthLakes") ~ "Zooplankton",
+# #     TRUE ~ NA
+# #     )) %>% filter(!is.na(taxa), scientific_name!= "Homo sapiens") %>% 
+# #   dplyr::mutate(taxa = factor(taxa))
+# 
+# 
+# # all_traits <- program_sp_trt_data %>% 
+# #   dplyr::select(c(1:9, 
+# #                 "age_life.span_years",
+# #                 "diet_trophic.level_num",
+# #                 "reproduction_reproductive.rate_num.offspring.per.year",
+# #                 "mass_adult_g",
+# #                 "active.time_category_ordinal", "taxa")) %>%
+# #   group_by(project) %>% mutate(tr.age.zp = scale(age_life.span_years)[,1],
+# #                                tr.trophic.level.zp = scale(diet_trophic.level_num)[,1],
+# #                                tr.reproductive.rate.zp = scale(reproduction_reproductive.rate_num.offspring.per.year)[,1],
+# #                                tr.mass.adult.zp = scale(log(mass_adult_g, 10))[,1]
+# #                                )
+# 
+# all_traits <- program_sp_trt_data %>% filter(scientific_name !="Homo sapiens", taxa !="BAD") %>%
 #   dplyr::select(c(1:9, 
-#                 "age_life.span_years",
-#                 "diet_trophic.level_num",
-#                 "reproduction_reproductive.rate_num.offspring.per.year",
-#                 "mass_adult_g",
-#                 "active.time_category_ordinal", "taxa")) %>%
-#   group_by(project) %>% mutate(tr.age.zp = scale(age_life.span_years)[,1],
-#                                tr.trophic.level.zp = scale(diet_trophic.level_num)[,1],
-#                                tr.reproductive.rate.zp = scale(reproduction_reproductive.rate_num.offspring.per.year)[,1],
-#                                tr.mass.adult.zp = scale(log(mass_adult_g, 10))[,1]
-#                                )
+#                   "age_life.span_years",
+#                   "diet_trophic.level_num",
+#                   "reproduction_reproductive.rate_num.offspring.per.year",
+#                   "mass_adult_g",
+#                   "active.time_category_ordinal", "taxa")) %>%
+#   group_by(project) %>% 
+#   mutate(tr.age.zp = scale(age_life.span_years)[,1],
+#          tr.trophic.level.zp = scale(diet_trophic.level_num)[,1],
+#          tr.reproductive.rate.zp = scale(reproduction_reproductive.rate_num.offspring.per.year)[,1],
+#          tr.mass.adult.zp = scale(log(mass_adult_g, 10))[,1]
+#   ) %>%
+#   ungroup() %>% group_by(taxa) %>%
+#   mutate(tr.age.zt = scale(age_life.span_years)[,1],
+#          tr.trophic.level.zt = scale(diet_trophic.level_num)[,1],
+#          tr.reproductive.rate.zt = scale(reproduction_reproductive.rate_num.offspring.per.year)[,1],
+#          tr.mass.adult.zt = scale(log(mass_adult_g, 10))[,1]
+#   )
+# 
+# # Order and create the Active time categories:
+# all_traits1 <- all_traits %>% 
+#   dplyr::mutate(active.time_category_new = case_when(
+#     active.time_category_ordinal == "diurnal" ~ "diurnal",
+#     active.time_category_ordinal == "nocturnal" ~ "nocturnal",
+#     ! active.time_category_ordinal %in% c("diurnal", "nocturnal", "") ~ "cathemeral")) %>% 
+#   dplyr::select(-c(active.time_category_ordinal)) %>% 
+#   dplyr::rename(tr.active.time = active.time_category_new)
+# 
+# # ----
 
-all_traits <- program_sp_trt_data %>% filter(scientific_name !="Homo sapiens", taxa !="BAD") %>%
-  dplyr::select(c(1:9, 
-                  "age_life.span_years",
-                  "diet_trophic.level_num",
-                  "reproduction_reproductive.rate_num.offspring.per.year",
-                  "mass_adult_g",
-                  "active.time_category_ordinal", "taxa")) %>%
-  group_by(project) %>% 
-  mutate(tr.age.zp = scale(age_life.span_years)[,1],
-         tr.trophic.level.zp = scale(diet_trophic.level_num)[,1],
-         tr.reproductive.rate.zp = scale(reproduction_reproductive.rate_num.offspring.per.year)[,1],
-         tr.mass.adult.zp = scale(log(mass_adult_g, 10))[,1]
-  ) %>%
-  ungroup() %>% group_by(taxa) %>%
-  mutate(tr.age.zt = scale(age_life.span_years)[,1],
-         tr.trophic.level.zt = scale(diet_trophic.level_num)[,1],
-         tr.reproductive.rate.zt = scale(reproduction_reproductive.rate_num.offspring.per.year)[,1],
-         tr.mass.adult.zt = scale(log(mass_adult_g, 10))[,1]
-  )
 
-# Order and create the Active time categories:
-all_traits1 <- all_traits %>% 
-  dplyr::mutate(active.time_category_new = case_when(
-    active.time_category_ordinal == "diurnal" ~ "diurnal",
-    active.time_category_ordinal == "nocturnal" ~ "nocturnal",
-    ! active.time_category_ordinal %in% c("diurnal", "nocturnal", "") ~ "cathemeral")) %>% 
-  dplyr::select(-c(active.time_category_ordinal)) %>% 
-  dplyr::rename(tr.active.time = active.time_category_new)
 
-# ----
+##### LOAD DATA #################
+all_traits <- readRDS(file.path("transformed_data", "sp_tr_zscore.rds"))
 
 # Reduce the project trait dataframe to species with tr data complete:
-all_traits.verts <- all_traits1 %>% filter(taxa %in% c("Fish","Amphibians","Mammals"))
+all_traits.verts <- all_traits %>% filter(taxa %in% c("Fish","Amphibians","Mammals"))
 
 #all_traits.verts$n_nas <- rowSums(is.na(all_traits.verts[,grep(pattern = "tr.", x = colnames(all_traits.verts))]))
 all_traits.verts$n_nas <- rowSums(is.na(all_traits.verts[,grep(pattern = ".zp", x = colnames(all_traits.verts))]))
