@@ -39,49 +39,55 @@ sp_pro_list <- read.csv(file.path("Data", "species_tidy-data", "23_species_maste
 sp_pro_list_v2 <- sp_pro_list %>%
   dplyr::mutate(across(everything(), na_if, y = ""))
 
-#Isolate all distinct taxa names, the original master list by project so duplicates across programs with same taxa
-master_sp_list <- sp_pro_list %>%
-  dplyr::select(scientific_name) %>%
-  dplyr::distinct() 
+# #Isolate all distinct taxa names, the original master list by project so duplicates across programs with same taxa
+# master_sp_list <- sp_pro_list %>% 
+#   dplyr::select(scientific_name, project) %>%
+#   dplyr::distinct() 
+
+
+sp_pro_list_v2$sp.proj <- paste(sp_pro_list_v2$scientific_name, sp_pro_list_v2$project, sep=".")
+
+sp_pro_list_v3 <- sp_pro_list_v2 %>% distinct(sp.proj, .keep_all = T)
 
 #total_sci_name_duplicates <- sum(duplicated(master_sp_list$scientific_name))
-#length(unique(master_sp_list$scientific_name)) # 2529 distinct taxa in master species list 
+# #length(unique(master_sp_list$scientific_name)) # 2529 distinct taxa in master species list 
+# 
+# master_sp_list_v2 <- master_sp_list %>%
+#   dplyr::left_join(
+#     sp_pro_list_v2 %>%
+#       dplyr::select(project,habitat,raw_filename,scientific_name, phylum, class, order, family, genus)%>%
+#       dplyr::distinct(),
+#     by = "scientific_name")
+# 
+# 
+# #Check duplicates
+# master_sp_duplicates <- sum(duplicated(master_sp_list_v2$scientific_name))  
+# #scientific_name but have at least one difference in higher order taxonomic level 
+# 
+# #Extract duplicates scientific_names 160 unique 
+# master_sp_dup_names <-master_sp_list_v2 %>%
+#   dplyr::group_by(scientific_name) %>%
+#   dplyr::filter(n() > 1) %>%
+#   ungroup()
+# 
+# ##For now will arbitrarily keep the first occurrence but will go back and check correct class names. Also which source?
+# master_sp_remove_dup <- master_sp_dup_names %>%
+#   dplyr::group_by(scientific_name) %>%
+#   dplyr::slice(1) %>% # select first row for each scientific name
+#   dplyr::ungroup() #now 160 obs 
+# 
+# # remove duplicate names from 'master_sp_list_v2' 
+# 
+# master_sp_no_dup <- master_sp_list_v2 %>%
+#   dplyr::anti_join(master_sp_dup_names, 
+#                    by= "scientific_name")
+# 
+# 
+# #combine master sp. list with no duplicates with paired down scientific_names 'master_sp_remove_dup'
+# 
+# master_sp_list_ready <- bind_rows(master_sp_no_dup, master_sp_remove_dup) #now should have same names as orig. 'master_sp_list'
 
-master_sp_list_v2 <- master_sp_list %>%
-  dplyr::left_join(
-    sp_pro_list_v2 %>%
-      dplyr::select(project,habitat,raw_filename,scientific_name, phylum, class, order, family, genus)%>%
-      dplyr::distinct(),
-    by = "scientific_name")
-
-
-#Check duplicates
-master_sp_duplicates <- sum(duplicated(master_sp_list_v2$scientific_name))  
-#scientific_name but have at least one difference in higher order taxonomic level 
-
-#Extract duplicates scientific_names 160 unique 
-master_sp_dup_names <-master_sp_list_v2 %>%
-  dplyr::group_by(scientific_name) %>%
-  dplyr::filter(n() > 1) %>%
-  ungroup()
-
-##For now will arbitrarily keep the first occurrence but will go back and check correct class names. Also which source?
-master_sp_remove_dup <- master_sp_dup_names %>%
-  dplyr::group_by(scientific_name) %>%
-  dplyr::slice(1) %>% # select first row for each scientific name
-  dplyr::ungroup() #now 160 obs 
-
-# remove duplicate names from 'master_sp_list_v2' 
-
-master_sp_no_dup <- master_sp_list_v2 %>%
-  dplyr::anti_join(master_sp_dup_names, 
-                   by= "scientific_name")
-
-#combine master sp. list with no duplicates with paired down scientific_names 'master_sp_remove_dup'
-
-master_sp_list_ready <- bind_rows(master_sp_no_dup, master_sp_remove_dup) #now should have same names as orig. 'master_sp_list'
-
-
+master_sp_list_ready <- sp_pro_list_v3
 
 
 
@@ -110,25 +116,39 @@ program_sp_trt_data$age_life.span_years[which(program_sp_trt_data$age_life.span_
 # KBS_INS - insects
 # KONZA - insects
 
+
+
+project.taxon <- data.frame(project = unique(program_sp_trt_data$project))
+
+project.taxon$taxa <- NA
+project.taxon$taxa[which(project.taxon$project %in% c("NGA","Arctic","Palmer","CCE", "NorthLakes"))] <- "Zooplankton"
+project.taxon$taxa[which(project.taxon$project %in% c("CoastalCA","FCE","SBC","MCR","VCR","RLS","FISHGLOB"))] <- "Fish"
+project.taxon$taxa[which(project.taxon$project %in% c("KBS_MAM","SEV","MOHONK_MAM"))] <- "Mammals"
+project.taxon$taxa[which(project.taxon$project %in% c("MOHONK_BIR","KBS_BIR","SBC_BEACH","HARVARD"))] <- "Birds"
+project.taxon$taxa[which(project.taxon$project %in% c("KBS_AMP"))] <- "Amphibians"
+project.taxon$taxa[which(project.taxon$project %in% c("KONZA","PIE","KBS_INS","MOHONK"))] <- "BAD"
+
 # Create a new column for Taxa:
-program_sp_trt_data <- program_sp_trt_data %>% 
-  mutate(taxa = case_when(
-    project == "CoastalCA" ~ "Fish",
-    project == "FCE" ~ "Fish",
-    project == "SBC" ~ "Fish",
-    project == "MCR" ~ "Fish",
-    project == "VCR" ~ "Fish",
-    project == "RLS" ~ "Fish",
-    project == "FISHGLOB" ~ "Fish",
-    project == "KBS_MAM" ~ "Mammals",
-    project == "SEV" ~ "Mammals",
-    project == "MOHONK" ~ "Amphibians",
-    project == "KBS_AMP" ~ "Amphibians",
-    project %in% c("HARVARD", "KBS_BIR","SBC_BEACH") ~ "Birds",
-    project %in% c("NGA","Arctic","Palmer","CCE","NorthLakes") ~ "Zooplankton",
-    TRUE ~ NA
-    )) %>% filter(!is.na(taxa), scientific_name!= "Homo sapiens") %>% 
-  dplyr::mutate(taxa = factor(taxa))
+program_sp_trt_data$taxa <- project.taxon$taxa[match(program_sp_trt_data$project, project.taxon$project)]
+
+# program_sp_trt_data1 <- program_sp_trt_data %>% 
+#   mutate(taxa = case_when(
+#     project == "CoastalCA" ~ "Fish",
+#     project == "FCE" ~ "Fish",
+#     project == "SBC" ~ "Fish",
+#     project == "MCR" ~ "Fish",
+#     project == "VCR" ~ "Fish",
+#     project == "RLS" ~ "Fish",
+#     project == "FISHGLOB" ~ "Fish",
+#     project == "KBS_MAM" ~ "Mammals",
+#     project == "SEV" ~ "Mammals",
+#     project == "MOHONK" ~ "Amphibians",
+#     project == "KBS_AMP" ~ "Amphibians",
+#     project %in% c("HARVARD", "KBS_BIR","SBC_BEACH") ~ "Birds",
+#     project %in% c("NGA","Arctic","Palmer","CCE","NorthLakes") ~ "Zooplankton",
+#     TRUE ~ NA
+#     )) %>% filter(!is.na(taxa), scientific_name!= "Homo sapiens") %>% 
+#   dplyr::mutate(taxa = factor(taxa))
 
 
 # all_traits <- program_sp_trt_data %>% 
@@ -144,7 +164,7 @@ program_sp_trt_data <- program_sp_trt_data %>%
 #                                tr.mass.adult.zp = scale(log(mass_adult_g, 10))[,1]
 #                                )
 
-all_traits <- program_sp_trt_data %>% 
+all_traits <- program_sp_trt_data %>% filter(scientific_name !="Homo sapiens", taxa !="BAD") %>%
   dplyr::select(c(1:9, 
                   "age_life.span_years",
                   "diet_trophic.level_num",
@@ -322,7 +342,7 @@ taxa.df <- onlytraits.nat %>% mutate(scientific.name = rownames(.)) %>%
 library(patchwork)
 library(viridis)
 
-taxa.df.viridistaxa.df.hulls <- taxa.df %>%
+taxa.df.hulls <- taxa.df %>%
   group_by(taxa) %>%
   slice(chull(PC1, PC2))
 
@@ -456,7 +476,7 @@ all_tr_faxes.t <- mFD::traits.faxes.cor(
   sp_faxes_coord = sp_faxes_coord_all.t[ , c("PC1", "PC2", "PC3")], 
   plot           = TRUE, 
   stop_if_NA = FALSE)
-all_tr_faxes
+all_tr_faxes.t
 
 # Plot functional space:
 fctsp_all.t <- mFD::funct.space.plot(
@@ -508,7 +528,7 @@ taxa.df.hulls.t <- taxa.df.t %>%
   group_by(taxa) %>%
   slice(chull(PC1.t, PC2.t))
 
-p2age.t <- ggplot(taxa.df.t, aes(x = PC1, y = PC2)) +
+p2age.t <- ggplot(taxa.df.t, aes(x = PC1.t, y = PC2.t)) +
   geom_point(aes(fill = tr.age.zt, shape = taxa), size = 2) +
   geom_polygon(data = taxa.df.hulls.t, aes(lty = taxa), color = "black", fill = NA) +
   scale_fill_viridis() +
@@ -517,7 +537,7 @@ p2age.t <- ggplot(taxa.df.t, aes(x = PC1, y = PC2)) +
 p2age.t  
 
 
-p2trophic.t <- ggplot(taxa.df.t, aes(x = PC1, y = PC2)) +
+p2trophic.t <- ggplot(taxa.df.t, aes(x = PC1.t, y = PC2.t)) +
   geom_point(aes(fill = tr.trophic.level.zt, shape = taxa), size = 2) +
   geom_polygon(data = taxa.df.hulls.t, aes(lty = taxa), color = "black", fill = NA) +
   scale_fill_viridis() +
@@ -526,7 +546,7 @@ p2trophic.t <- ggplot(taxa.df.t, aes(x = PC1, y = PC2)) +
 p2trophic.t
 
 
-p2mass.t <- ggplot(taxa.df.t, aes(x = PC1, y = PC2)) +
+p2mass.t <- ggplot(taxa.df.t, aes(x = PC1.t, y = PC2.t)) +
   geom_point(aes(fill = tr.mass.adult.zt, shape = taxa), size = 2) +
   geom_polygon(data = taxa.df.hulls.t, aes(lty = taxa), color = "black", fill = NA) +
   scale_fill_viridis() +
@@ -535,7 +555,7 @@ p2mass.t <- ggplot(taxa.df.t, aes(x = PC1, y = PC2)) +
 p2mass.t
 
 
-p2rep.t <- ggplot(taxa.df.t, aes(x = PC1, y = PC2)) +
+p2rep.t <- ggplot(taxa.df.t, aes(x = PC1.t, y = PC2.t)) +
   geom_point(aes(fill = tr.reproductive.rate.zt, shape = taxa), size = 2) +
   geom_polygon(data = taxa.df.hulls.t, aes(lty = taxa), color = "black", fill = NA) +
   scale_fill_viridis() +
@@ -543,7 +563,7 @@ p2rep.t <- ggplot(taxa.df.t, aes(x = PC1, y = PC2)) +
   theme_bw()
 p2rep.t
 
-p2time <- ggplot(taxa.df.t, aes(x = PC1, y = PC2)) +
+p2time <- ggplot(taxa.df.t, aes(x = PC1.t, y = PC2.t)) +
   geom_point(aes(color = tr.active.time, shape = taxa), size = 2) +
   geom_polygon(data = taxa.df.hulls.t, aes(lty = taxa), color = "black", fill = NA) +
   scale_color_viridis_d() +
