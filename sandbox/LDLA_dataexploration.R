@@ -225,16 +225,16 @@ onlytraits <- data.frame(all_traits.final %>% ungroup() %>% select(ends_with(".z
 rownames(onlytraits) <- all_traits.final$sp.proj
 #colnames(onlytraits) <- c("tr.age.zp", "tr.trophic.level.zp", "tr.reproductive.rate.zp", "tr.mass.adult.zp", "tr.active.time" )
 
-onlytraits.nat <- onlytraits %>% select(-tr.active.time)
+onlytraits.nat <- onlytraits %>% select(-tr.active.time, -tr.fecundity.zp, -tr.length.adult.zp)
 
 
-# Build a dataframe gathering traits categories:
-tr_nm <- colnames(onlytraits)
-tr_cat <- c("Q", "Q", "Q","Q","N")
-tr_cat_df <- as.data.frame(matrix(ncol = 2, nrow = 5))
-tr_cat_df[, 1] <- tr_nm
-tr_cat_df[, 2] <- tr_cat
-colnames(tr_cat_df) <- c("trait_name", "trait_type")
+# # Build a dataframe gathering traits categories:
+# tr_nm <- colnames(onlytraits)
+# tr_cat <- c("Q", "Q", "Q","Q","N")
+# tr_cat_df <- as.data.frame(matrix(ncol = 2, nrow = 5))
+# tr_cat_df[, 1] <- tr_nm
+# tr_cat_df[, 2] <- tr_cat
+# colnames(tr_cat_df) <- c("trait_name", "trait_type")
 
 # NO ACTIVE TIME Build a dataframe gathering traits categories:
 tr_nm <- colnames(onlytraits.nat)
