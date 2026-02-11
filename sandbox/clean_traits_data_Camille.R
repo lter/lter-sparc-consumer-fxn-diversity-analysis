@@ -173,7 +173,7 @@ all_traits <- program_sp_trt_data %>% filter(scientific_name !="Homo sapiens", t
          tr.trophic.level.zp = scale(diet_trophic.level_num)[,1],
          tr.reproductive.rate.zp = scale(reproduction_reproductive.rate_num.offspring.per.year)[,1],
          tr.fecundity.zp = scale(reproduction_fecundity_num)[,1],
-         tr.reproduction.unified.zp = scale(reproduction.unified)[,1],
+         tr.reproduction.unified.zp = scale(log(reproduction.unified,10))[,1],
          tr.mass.adult.zp = scale(log(mass_adult_g, 10))[,1],
          tr.length.adult.zp = scale(log(length_adult_cm, 10))[,1]
   ) %>%
@@ -182,7 +182,7 @@ all_traits <- program_sp_trt_data %>% filter(scientific_name !="Homo sapiens", t
          tr.trophic.level.zt = scale(diet_trophic.level_num)[,1],
          tr.reproductive.rate.zt = scale(reproduction_reproductive.rate_num.offspring.per.year)[,1],
          tr.fecundity.zt = scale(reproduction_fecundity_num)[,1],
-         tr.reproduction.unified.zt = scale(reproduction.unified)[,1],
+         tr.reproduction.unified.zt = scale(log10(reproduction.unified))[,1],
          tr.mass.adult.zt = scale(log(mass_adult_g, 10))[,1],
          tr.length.adult.zt = scale(log(length_adult_cm, 10))[,1]
   )

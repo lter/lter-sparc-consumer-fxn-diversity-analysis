@@ -206,7 +206,7 @@ all_traits$n_nas <- rowSums(is.na(all_traits[,grep(pattern = ".zp", x = colnames
 
 
 # Reduce the project trait dataframe to species with tr data complete:
-all_traits.verts <- all_traits %>% filter(taxa %in% c("Fish","Amphibians","Mammals"))
+all_traits.verts <- all_traits %>% filter(taxa %in% c("Fish","Birds"))
 
 #all_traits.verts$n_nas <- rowSums(is.na(all_traits.verts[,grep(pattern = "tr.", x = colnames(all_traits.verts))]))
 all_traits.verts$n_nas <- rowSums(is.na(all_traits.verts[,grep(pattern = ".zp", x = colnames(all_traits.verts))]))
@@ -414,7 +414,7 @@ onlytraits.t <- data.frame(all_traits.final %>% ungroup() %>% select(ends_with("
 rownames(onlytraits.t) <- all_traits.final$sp.proj
 #colnames(onlytraits) <- c("tr.age.zp", "tr.trophic.level.zp", "tr.reproductive.rate.zp", "tr.mass.adult.zp", "tr.active.time" )
 
-onlytraits.nat.t <- onlytraits.t %>% select(-tr.active.time, -tr.reproductive.rate.zt, -tr.length.adult.zt)
+onlytraits.nat.t <- onlytraits.t %>% select(-tr.active.time,-tr.fecundity.zt, -tr.reproductive.rate.zt, -tr.length.adult.zt)
 
 
 # # Build a dataframe gathering traits categories:
