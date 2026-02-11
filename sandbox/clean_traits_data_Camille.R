@@ -73,13 +73,27 @@ sp_list_ready$taxa <- project.taxon$taxa[match(sp_list_ready$project, project.ta
 # 3 - Cleaning non-focal taxa  =========================
 
 
+# Get the classes of our Fish projects:
+sp_list_fish_marine <- sp_list_ready %>% 
+  dplyr::filter(project %in% c("CoastalCA","FCE","SBC","MCR","VCR","RLS","FISHGLOB"))
+unique(sp_list_fish_marine$class)
 
+# Keep: "Actinopterygii", "Teleostei", "Elasmobranchii", "Chondrichthyes"
+sp_list_fish_marine_corrected <- sp_list_fish_marine %>% 
+  dplyr::filter(class %in% c("Actinopterygii", "Teleostei", "Elasmobranchii", 
+                               "Chondrichthyes"))
+  
+sp_list_ready_corrected <- sp_list_ready %>% 
+  dplyr::filter(!project %in% c("CoastalCA","FCE","SBC","MCR","VCR","RLS","FISHGLOB")) %>% 
+  dplyr::bind_rows(sp_list_fish_marine_corrected)
 
-
+# Save it:
+saveRDS(sp_list_ready_corrected,
+        file.path("transformed_data", "species_list_corrected_fish.rds"))
 
 
 #Join trait data with program species list 
-program_sp_trt_data <- dplyr::left_join(sp_list_ready, imp_tr_df,
+program_sp_trt_data <- dplyr::left_join(sp_list_ready_corrected, imp_tr_df,
                                         by="scientific_name") %>%
   dplyr::mutate(
     order = coalesce(order.x, order.y),
@@ -133,42 +147,50 @@ program_sp_trt_data$taxa <- project.taxon$taxa[match(program_sp_trt_data$project
 all_traits <- program_sp_trt_data %>% filter(scientific_name !="Homo sapiens", taxa !="BAD") %>%
   dplyr::select(c(1:9, 
                   "age_life.span_years",
+                  "length_adult_cm",
                   "diet_trophic.level_num",
                   "reproduction_reproductive.rate_num.offspring.per.year",
+                  "reproduction_fecundity_num",
                   "mass_adult_g",
                   "active.time_category_ordinal", "taxa")) %>%
+  dplyr::mutate(age_life.span_years = if_else(age_life.span_years <= 0,
+                                              NA, age_life.span_years)) %>% 
+  dplyr::mutate(reproduction_fecundity_num = if_else(reproduction_fecundity_num < 0, 
+                                                     NA, reproduction_fecundity_num)) %>% 
   group_by(project) %>% 
   mutate(tr.age.zp = scale(age_life.span_years)[,1],
          tr.trophic.level.zp = scale(diet_trophic.level_num)[,1],
          tr.reproductive.rate.zp = scale(reproduction_reproductive.rate_num.offspring.per.year)[,1],
-         tr.mass.adult.zp = scale(log(mass_adult_g, 10))[,1]
+         tr.fecundity.zp = scale(reproduction_fecundity_num)[,1],
+         tr.mass.adult.zp = scale(log(mass_adult_g, 10))[,1],
+         tr.length.adult.zp = scale(log(length_adult_cm, 10))[,1]
   ) %>%
   ungroup() %>% group_by(taxa) %>%
   mutate(tr.age.zt = scale(age_life.span_years)[,1],
          tr.trophic.level.zt = scale(diet_trophic.level_num)[,1],
          tr.reproductive.rate.zt = scale(reproduction_reproductive.rate_num.offspring.per.year)[,1],
-         tr.mass.adult.zt = scale(log(mass_adult_g, 10))[,1]
+         tr.fecundity.zt = scale(reproduction_fecundity_num)[,1],
+         tr.mass.adult.zt = scale(log(mass_adult_g, 10))[,1],
+         tr.length.adult.zt = scale(log(length_adult_cm, 10))[,1]
   )
 
 # Order and create the Active time categories:
 
 
-all_traits$tr.active.time <- all_traits %>% ungroup() %>% 
-  dplyr::mutate(active.time_category_new = case_when(
-    active.time_category_ordinal == "diurnal" ~ "diurnal",
-    active.time_category_ordinal == "nocturnal" ~ "nocturnal",
-    ! active.time_category_ordinal %in% c("diurnal", "nocturnal", "") ~ "cathemeral")) %>% 
-  dplyr::select(active.time_category_new) %>% 
-  dplyr::rename(tr.active.time = active.time_category_new)
+# all_traits$tr.active.time <- all_traits %>% ungroup() %>% 
+#   dplyr::mutate(active.time_category_new = case_when(
+#     active.time_category_ordinal == "diurnal" ~ "diurnal",
+#     active.time_category_ordinal == "nocturnal" ~ "nocturnal",
+#     ! active.time_category_ordinal %in% c("diurnal", "nocturnal", "") ~ "cathemeral")) %>% 
+#   dplyr::select(active.time_category_new) %>% 
+#   dplyr::rename(tr.active.time = active.time_category_new)
 
 # ----
 
 
-
-
-
-
-saveRDS(all_traits1, file.path("transformed_data",  "sp_tr_zscore.rds"))
+saveRDS(all_traits,
+        file.path("transformed_data",
+                  "sp_tr_zscore.rds"))
 
 
 
