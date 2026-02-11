@@ -93,7 +93,8 @@ dt1 <- dt |>
       mutate(count = case_when(
             count == 0 ~ 1,
             TRUE ~ count
-      )) 
+      )) |> 
+      filter(count < 1000) 
 
 unique(dt1$phylum)
 unique(dt1$project)
@@ -103,9 +104,10 @@ glimpse(dt1)
 
 dt2 <- dt1 |>
       filter(project != 'MCR') |> 
-      group_by(project, habitat, year, month, scientific_name,
+      group_by(project, habitat, year, month,
                site, subsite_level1, subsite_level2, subsite_level3) |> 
       summarize(
+            species_richness = n_distinct(scientific_name[dmperind_g_ind!=0]),
             ### calculate total nitrogen supply at each sampling unit and then sum to get column with all totals
             total_nitrogen_m = sum(nind_ug_hr * density, na_rm = TRUE),
             total_nitrogen_m2 = sum(nind_ug_hr * density, na_rm = TRUE),
@@ -126,15 +128,16 @@ dt2 <- dt1 |>
             total_bm_area = coalesce(total_bm_m, total_bm_m2)) |>  
       ungroup() |> 
       arrange(project, year) |> 
-      dplyr::select(project, habitat, scientific_name, site, subsite_level1, subsite_level2, subsite_level3,
-                    year, month, total_n_area, total_p_area, total_bm_area)
+      dplyr::select(project, habitat, site, subsite_level1, subsite_level2, subsite_level3,
+                    year, month, total_n_area, total_p_area, total_bm_area, species_richness)
 glimpse(dt2)
 
 dt2a <- dt1 |>
       filter(project == 'MCR') |> 
-      group_by(project, habitat, year, month, scientific_name,
+      group_by(project, habitat, year, month,
                site, subsite_level1, subsite_level2, subsite_level3) |> 
       summarize(
+            species_richness = n_distinct(scientific_name[dmperind_g_ind!=0]),
             ### calculate total nitrogen supply at each sampling unit and then sum to get column with all totals
             total_nitrogen_m = sum(nind_ug_hr * density, na_rm = TRUE),
             total_nitrogen_m2 = sum(nind_ug_hr * density, na_rm = TRUE),
@@ -152,13 +155,12 @@ dt2a <- dt1 |>
             total_bm_m2 = sum(dmperind_g_ind * density, na_rm = TRUE),
             # total_bm_m3 = sum(dmperind_g_ind*ind_density_num, na_rm = TRUE),
             ### create column with total_biomass for each program, regardless of units
-            total_bm_area = coalesce(total_bm_m, total_bm_m2),
-            subsite_level3 = 'Not Available') |> 
+            total_bm_area = coalesce(total_bm_m, total_bm_m2)) |>  
       ungroup() |> 
       arrange(project, year) |> 
-      dplyr::select(project, habitat, scientific_name, site, subsite_level1, subsite_level2, subsite_level3,
-                    year, month, total_n_area, total_p_area, total_bm_area)
-glimpse(dt2a)
+      dplyr::select(project, habitat, site, subsite_level1, subsite_level2, subsite_level3,
+                    year, month, total_n_area, total_p_area, total_bm_area, species_richness)
+glimpse(dt2)
 dt2b <- rbind(dt2, dt2a)
 
 dt2c <- dt2b |> 
@@ -167,9 +169,12 @@ dt2c <- dt2b |>
             system = case_when(
                   project == 'SBC' & habitat == 'ocean' ~ site,
                   project == 'FCE' ~ paste(site, subsite_level1, sep = ''),
-                  project == 'MCR' ~ paste(subsite_level1, subsite_level2, sep = ''),
+                  project == 'MCR' ~ paste(subsite_level1, site, sep = ''),
                   project == 'COASTAL_CEN' ~ subsite_level2,
                   project == 'COASTAL_SOUTH' ~ subsite_level2)
       ) |> 
-      select(project, habitat, year, month, system, scientific_name, 
-             total_n_area, total_p_area, total_bm_area)
+      select(project, habitat, year, month, system, total_n_area, total_p_area, total_bm_area, species_richness) |> 
+      group_by(project, habitat, year, system) |> 
+      summarize(across(total_n_area:species_richness, ~mean(.x, na.rm = TRUE)),
+                .groups = 'drop')
+glimpse(dt2c)
