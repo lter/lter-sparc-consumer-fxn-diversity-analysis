@@ -203,56 +203,8 @@ traits <- read_csv('../Collaborative/FnxSynthBase/consumer-trait-species-imputed
       distinct()
 
 glimpse(traits)
+test <- traits |> filter(is.na(mass_adult_g))
 
 all <- dt2c |> left_join(traits)
 glimpse(all)
-
-traits <- all |>
-      select(scientific_name,
-             age_life.span_years,
-             diet_trophic.level_num,
-             mass_adult_g,
-             reproduction_reproductive.rate_num.offspring.per.clutch.or.litter) |>
-      distinct() |>
-      group_by(scientific_name) |>
-      summarize(across(everything(), ~ first(na.omit(.x))), .groups = "drop") |>
-      column_to_rownames("scientific_name")
-
-comm <- all |>
-      group_by(project, habitat, site,
-               subsite_level1, subsite_level2, subsite_level3,
-               scientific_name) |>
-      summarize(abund = sum(density, na.rm = TRUE),
-                .groups = "drop") |>
-      tidyr::pivot_wider(names_from = scientific_name,
-                         values_from = abund,
-                         values_fill = 0)
-
-meta <- comm |>
-      select(project, habitat, site,
-             subsite_level1, subsite_level2, subsite_level3)
-
-comm_mat <- comm |>
-      select(-project, -habitat, -site,
-             -subsite_level1, -subsite_level2, -subsite_level3) |>
-      as.matrix()
-
-common_species <- intersect(colnames(comm_mat), rownames(traits))
-comm_mat <- comm_mat[, common_species]
-traits <- traits[common_species, ]
-
-dist_mat <- mFD::funct.dist(
-      sp_tr = traits,
-      tr_cat = rep("Q", ncol(traits)),
-      metric = "gower",
-      scale_euclid = "scale_center",
-      ordinal_var   = "classic",
-      weight_type   = "equal"
-)
-
-
-#       select(project, habitat, year, month, system, total_n_area, total_p_area, total_bm_area, species_richness, species_richness_area) |> 
-#       group_by(project, habitat, year, system) |> 
-#       summarize(across(total_n_area:species_richness_area, ~mean(.x, na.rm = TRUE)),
-#                 .groups = 'drop')
-# glimpse(dt2c)
+# write_csv(all, '../Collaborative/dataforcamille.csv')
