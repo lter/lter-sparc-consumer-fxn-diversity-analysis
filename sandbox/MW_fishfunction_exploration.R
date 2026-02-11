@@ -57,6 +57,25 @@ dt <- read_csv("../Collaborative/FnxSynthBase/04_harmonized_consumer_excretion_s
 glimpse(dt)
 nacheck(dt)
 
+dt_og <- dt |>
+      group_by(project, habitat) |>
+      mutate(
+            mean_dmperind = mean(dmperind_g_ind, na.rm = TRUE),
+            sd_dmperind   = sd(dmperind_g_ind, na.rm = TRUE),
+            upper_bound   = mean_dmperind + 5 * sd_dmperind,
+            outlier_hi = dmperind_g_ind > upper_bound,
+            elasmo = class %in% c("Chondrichthyes", "Elasmobranchii") |
+                  order %in% c("Rajiformes", "Myliobatiformes", "Torpediniformes",
+                               "Pristiophoriformes", "Squaliformes", "Carcharhiniformes",
+                               "Lamniformes", "Orectolobiformes", "Hexanchiformes",
+                               "Heterodontiformes")
+      ) |>
+      ungroup() |>
+      filter(!(outlier_hi & elasmo)) |>
+      select(-mean_dmperind, -sd_dmperind, -upper_bound, -outlier_hi, -elasmo)
+
+test <- anti_join(dt, dt_og)
+
 ### check to see NA fixes incorporated
 na_count_per_column <- sapply(dt, function(x) sum(is.na(x)))
 print(na_count_per_column)
@@ -108,6 +127,7 @@ dt2 <- dt1 |>
                site, subsite_level1, subsite_level2, subsite_level3) |> 
       summarize(
             species_richness = n_distinct(scientific_name[dmperind_g_ind!=0]),
+            species_richness_area = species_richness/area,
             ### calculate total nitrogen supply at each sampling unit and then sum to get column with all totals
             total_nitrogen_m = sum(nind_ug_hr * density, na_rm = TRUE),
             total_nitrogen_m2 = sum(nind_ug_hr * density, na_rm = TRUE),
@@ -129,15 +149,17 @@ dt2 <- dt1 |>
       ungroup() |> 
       arrange(project, year) |> 
       dplyr::select(project, habitat, site, subsite_level1, subsite_level2, subsite_level3,
-                    year, month, total_n_area, total_p_area, total_bm_area, species_richness)
+                    year, month, total_n_area, total_p_area, total_bm_area, species_richness,
+                    species_richness_area)
 glimpse(dt2)
 
 dt2a <- dt1 |>
       filter(project == 'MCR') |> 
       group_by(project, habitat, year, month,
-               site, subsite_level1, subsite_level2, subsite_level3) |> 
+               site, subsite_level1, subsite_level2) |> 
       summarize(
             species_richness = n_distinct(scientific_name[dmperind_g_ind!=0]),
+            species_richness_area = species_richness/300,
             ### calculate total nitrogen supply at each sampling unit and then sum to get column with all totals
             total_nitrogen_m = sum(nind_ug_hr * density, na_rm = TRUE),
             total_nitrogen_m2 = sum(nind_ug_hr * density, na_rm = TRUE),
@@ -155,12 +177,14 @@ dt2a <- dt1 |>
             total_bm_m2 = sum(dmperind_g_ind * density, na_rm = TRUE),
             # total_bm_m3 = sum(dmperind_g_ind*ind_density_num, na_rm = TRUE),
             ### create column with total_biomass for each program, regardless of units
-            total_bm_area = coalesce(total_bm_m, total_bm_m2)) |>  
+            total_bm_area = coalesce(total_bm_m, total_bm_m2),
+            subsite_level3 = 'Not Available') |>  
       ungroup() |> 
       arrange(project, year) |> 
       dplyr::select(project, habitat, site, subsite_level1, subsite_level2, subsite_level3,
-                    year, month, total_n_area, total_p_area, total_bm_area, species_richness)
-glimpse(dt2)
+                    year, month, total_n_area, total_p_area, total_bm_area, species_richness, 
+                    species_richness_area)
+glimpse(dt2a)
 dt2b <- rbind(dt2, dt2a)
 
 dt2c <- dt2b |> 
@@ -173,8 +197,8 @@ dt2c <- dt2b |>
                   project == 'COASTAL_CEN' ~ subsite_level2,
                   project == 'COASTAL_SOUTH' ~ subsite_level2)
       ) |> 
-      select(project, habitat, year, month, system, total_n_area, total_p_area, total_bm_area, species_richness) |> 
+      select(project, habitat, year, month, system, total_n_area, total_p_area, total_bm_area, species_richness, species_richness_area) |> 
       group_by(project, habitat, year, system) |> 
-      summarize(across(total_n_area:species_richness, ~mean(.x, na.rm = TRUE)),
+      summarize(across(total_n_area:species_richness_area, ~mean(.x, na.rm = TRUE)),
                 .groups = 'drop')
 glimpse(dt2c)
