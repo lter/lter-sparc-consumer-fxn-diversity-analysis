@@ -7,6 +7,22 @@ list_raw <- ltertools::read(raw_folder = file.path("data", "terrestrial_communit
                             data_format = "csv")
 
 
+#investigating if these birds are dead or alive?
+#sbc_v1 <- read.csv(file = file.path("data", "terrestrial_community_raw-data", "Shorebird_count_20231020.csv"))
+#colnames(sbc_v1)
+#unique(sbc_v1$SURVEY)
+#sbc_v1 %>%
+ # filter(SURVEY == ".")
+
+sev_v1 <- read.csv(file = file.path("data", "terrestrial_community_raw-data", "SEV008_long.csv"))
+unique(sev_v1$species)
+
+sev_v1 %>%
+  
+
+#colnames(sbc_v1)
+
+
 # Make a list to store standardized outputs
 list_std <- list()
 
@@ -89,7 +105,25 @@ combo_v2_SBC <- combo_v2 %>%
   dplyr::mutate(scientific_name = paste(genus, species)) %>%
   select(-species) 
 
+#class -- . = no birds 
+# 
+combo_v2_SBC %>%
+  filter(is.na(class))
+
+unique(combo_v2_SBC$class)
+
 colnames(combo_v2_SBC)
+glimpse(combo_v2_SBC)
+unique(combo_v2_SBC$site) 
+#6 sites 
+colnames(combo_v2_SBC)
+unique(combo_v2_SBC$survey) 
+
+combo_v2_SEV <- combo_v2 %>%
+  filter(project == "SEV") %>%
+  filter(class != "Mammalia") %>%
+  dplyr::mutate(scientific_name = paste(genus, species)) %>%
+  select(-species) 
 
 combo_v2_allothers <- combo_v2 %>%
   filter(project != "SBC") %>%
