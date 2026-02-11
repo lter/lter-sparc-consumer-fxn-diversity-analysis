@@ -26,9 +26,8 @@ rm(list = ls()); gc()
 
 # 1 - Load data ================================================================
 
+
 # Call the new imputed data after download from Drive (ask Shalanda's ok):
-#imp_tr_df <- read.csv(file.path("Data", "traits_tidy-data", "consumer-trait-species-imputed-taxonmic-database.csv"))
-# But does not work - don't have the last version don't know why
 imp_tr_df <- read.csv(file.path("Data", "traits_tidy-data", "consumer-trait-species-imputed-taxonmic-database.csv"))
 
 
@@ -38,12 +37,14 @@ sp_list <- read.csv(file.path("Data", "species_tidy-data", "23_species_master-sp
 
 # 2 - Create a dataframe with species/hab/project/taxa =========================
 
-
+# change NAs to be blanks
 sp_list_v2 <- sp_list %>%
   dplyr::mutate(across(everything(), na_if, y = ""))
 
+# make a species.project column to keep species that occur in multiple projects
 sp_list_v2$sp.proj <- paste(sp_list_v2$scientific_name, sp_list_v2$project, sep=".")
 
+# remove duplicated species per project (came from multiple source files)
 sp_list_ready <- sp_list_v2 %>% distinct(sp.proj, .keep_all = T)
 
 
@@ -73,6 +74,7 @@ sp_list_ready$taxa <- project.taxon$taxa[match(sp_list_ready$project, project.ta
 # 3 - Cleaning non-focal taxa  =========================
 
 
+#--- Clean Fish (may be deprecated if cleaned upstream in sp list)
 # Get the classes of our Fish projects:
 sp_list_fish_marine <- sp_list_ready %>% 
   dplyr::filter(project %in% c("CoastalCA","FCE","SBC","MCR","VCR","RLS","FISHGLOB"))
@@ -90,6 +92,7 @@ sp_list_ready_corrected <- sp_list_ready %>%
 # Save it:
 saveRDS(sp_list_ready_corrected,
         file.path("transformed_data", "species_list_corrected_fish.rds"))
+#--- end cleaning fish 
 
 
 #Join trait data with program species list 
@@ -104,6 +107,7 @@ program_sp_trt_data <- dplyr::left_join(sp_list_ready_corrected, imp_tr_df,
   dplyr::relocate(source, .before = scientific_name) 
 #some source info absent need to fix this later!!! 
 
+# 0 or negative lifespans are actually NAs
 program_sp_trt_data$age_life.span_years[which(program_sp_trt_data$age_life.span_years<=0)] <- NA
 
 
@@ -152,7 +156,7 @@ all_traits <- program_sp_trt_data %>% filter(scientific_name !="Homo sapiens", t
                   "reproduction_reproductive.rate_num.offspring.per.year",
                   "reproduction_fecundity_num",
                   "mass_adult_g",
-                  "active.time_category_ordinal", "taxa")) %>%
+                  "tr.active.time" ="active.time_category_ordinal", "taxa")) %>%
   dplyr::mutate(age_life.span_years = if_else(age_life.span_years <= 0,
                                               NA, age_life.span_years)) %>% 
   dplyr::mutate(reproduction_fecundity_num = if_else(reproduction_fecundity_num < 0, 
