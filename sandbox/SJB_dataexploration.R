@@ -4,9 +4,8 @@
 
 
 communities <- read.csv(file = "Data/community_tidy-data/04_harmonized_consumer_excretion_sparc_cnd_site.csv") 
-glimpse(communities)
 
-comm.filtered <- communities %>%
+comm.filtered.abu <- communities %>%
   select(project, year, month, habitat, temp_c, site, subsite_level1, subsite_level2, subsite_level3,
          scientific_name, diet_cat, nind_ug.hr, pind_ug.hr, count_num, density_num.m, density_num.m2,
          density_num.m3,biomass_g, dmperind_g.ind, kingdom, phylum, class, order, family, genus) %>%
@@ -26,35 +25,104 @@ comm.filtered <- communities %>%
     project %in% c("NGA","Arctic","Palmer","CCE","NorthLakes") ~ "Zooplankton",
     TRUE ~ NA
   )) %>%
+  filter(habitat != "beach") %>%
   filter(taxa == "Fish") %>%
-  filter(density_num.m2 > 0) %>%
+  mutate(project = case_when(project == 'CoastalCA' & site == 'CENTRAL' ~ 'COASTAL_CEN',
+                             project == 'CoastalCA' & site == 'SOUTH' ~ 'COASTAL_SOUTH',
+                             TRUE ~ project)) %>%
+  mutate(density_num.m = case_when(is.na(density_num.m) ~ 0,
+                                   TRUE ~ density_num.m),
+         density_num.m2 = case_when(is.na(density_num.m2) ~ 0,
+                                    TRUE ~ density_num.m2)) %>%
+  mutate(density_coll = density_num.m+density_num.m2) %>%
+  filter(density_coll > 0) %>%
+  mutate(biomass_coll = dmperind_g.ind*density_coll) %>%
   unite("ID", c(project, habitat, site, subsite_level1, subsite_level2, subsite_level3,
                 year, month), sep = "_", remove = F) %>%
-  group_by(ID, scientific_name) %>%
-  summarize(density = sum(density_num.m2, na.rm = TRUE),
-            biomass = sum(biomass_g, na.rm = TRUE)) %>%
+  group_by(ID, project, scientific_name) %>%
+  summarize(density = sum(density_coll, na.rm = TRUE),
+            biomass = sum(biomass_coll)) %>%
+  group_by(project) %>%
+  filter(!is.na(density), !is.na(biomass)) %>%
+  mutate(z_density = scale(log(density))[,1],
+         z_biomass = scale(log(biomass+1))[,1]) %>%
   ungroup()
 
-traitsxcomms <- comm.filtered %>%
-  rename(scientific.name = "scientific_name") %>%
-  inner_join(taxa.df) %>%
+
+
+
+
+
+
+
+
+comm.filtered.abu <- communities %>%
+  select(project, year, month, habitat, temp_c, site, subsite_level1, subsite_level2, subsite_level3,
+         scientific_name, diet_cat, nind_ug.hr, pind_ug.hr, count_num, density_num.m, density_num.m2,
+         density_num.m3,biomass_g, dmperind_g.ind, kingdom, phylum, class, order, family, genus) %>%
+  mutate(taxa = case_when(
+    project == "CoastalCA" ~ "Fish",
+    project == "FCE" ~ "Fish",
+    project == "SBC" ~ "Fish",
+    project == "MCR" ~ "Fish",
+    project == "VCR" ~ "Fish",
+    project == "RLS" ~ "Fish",
+    project == "FISHGLOB" ~ "Fish",
+    project == "KBS_MAM" ~ "Mammals",
+    project == "SEV" ~ "Mammals",
+    project == "MOHONK" ~ "Amphibians",
+    project == "KBS_AMP" ~ "Amphibians",
+    project %in% c("HARVARD", "KBS_BIR","SBC_BEACH") ~ "Birds",
+    project %in% c("NGA","Arctic","Palmer","CCE","NorthLakes") ~ "Zooplankton",
+    TRUE ~ NA
+  )) %>%
+  filter(habitat != "beach") %>%
+  filter(taxa == "Fish") %>%
+  mutate(project = case_when(project == 'CoastalCA' & site == 'CENTRAL' ~ 'COASTAL_CEN',
+                             project == 'CoastalCA' & site == 'SOUTH' ~ 'COASTAL_SOUTH',
+                             TRUE ~ project)) %>%
+  mutate(density_num.m = case_when(is.na(density_num.m) ~ 0,
+                                   TRUE ~ density_num.m),
+         density_num.m2 = case_when(is.na(density_num.m2) ~ 0,
+                                   TRUE ~ density_num.m2)) %>%
+  mutate(density_coll = density_num.m+density_num.m2) %>%
+  filter(density_coll > 0) %>%
+  mutate(biomass_coll = dmperind_g.ind*density_coll) %>%
+  unite("ID", c(project, habitat, site, subsite_level1, subsite_level2, subsite_level3,
+                year, month), sep = "_", remove = F) %>%
+  group_by(ID, project, scientific_name) %>%
+  summarize(density = sum(density_coll, na.rm = TRUE),
+            biomass = sum(biomass_coll)) %>%
   group_by(project) %>%
-  mutate(z_density = scale(density)[,1])
+  filter(!is.na(density), !is.na(biomass)) %>%
+  mutate(z_density = scale(log(density))[,1],
+         z_biomass = scale(log(biomass+1))[,1]) %>%
+  ungroup()
 
-
-test <- traitsxcomms %>%
+test <- comm.filtered %>%
   filter(project == "FCE")
 
-density.plot <- ggplot(traitsxcomms, aes(x = log(z_density))) +
+density.plot <- ggplot(comm.filtered, aes(x = z_biomass)) +
   geom_histogram(aes(fill = project)) +
   facet_grid(project~., scales = "free_y")
 density.plot
 
 
+traits.df.parsed <- taxa.df %>%
+  ungroup() %>%
+  select(scientific_name, PC1, PC2)
+
+traitsxcomms <- comm.filtered %>%
+  ungroup() %>%
+  inner_join(traits.df.parsed, by = "scientific_name") %>%
+  distinct()
+
+anti <- comm.filtered %>%
+  anti_join(taxa.df)
 
 ### function for KDE
 
-weighted_kde2d <- function(x, y, w, n = 200, bandwidth_factor = 4) {
+weighted_kde2d <- function(x, y, w, n = 200, bandwidth_factor = 6) {
   gx <- seq(min(x), max(x), length.out = n)
   gy <- seq(min(y), max(y), length.out = n)
   
@@ -80,11 +148,7 @@ weighted_kde2d <- function(x, y, w, n = 200, bandwidth_factor = 4) {
 
 #### create dataframe
 df_long <- traitsxcomms %>%
-  filter(!is.na(PC1), !is.na(PC2)) %>%
-  filter(z_density > 0) 
-
-test <- df_long %>%
-  filter(project == "SBC")
+  filter(!is.na(PC1), !is.na(PC2)) 
 
 ### run KDE function for each project
 kde_by_proj <- df_long %>%
@@ -92,7 +156,7 @@ kde_by_proj <- df_long %>%
   group_modify(~ {
     x <- .x$PC1
     y <- .x$PC2
-    w <- .x$z_density
+    w <- .x$density
     
     kde <- weighted_kde2d(x, y, w, n = 200)
     
@@ -104,8 +168,6 @@ kde_by_proj <- df_long %>%
   }) %>%
   ungroup()
 
-test <- kde_by_proj %>%
-  filter(project == "SBC")
 
 ### plot for each project
 list_of_dfs_tidy <- kde_by_proj %>%
@@ -255,9 +317,252 @@ contour_plots6 <- ggplot(list_of_dfs_tidy[[6]], aes(PC1, PC2, z = density)) +
   )
 contour_plots6
 
-contour.plots <- (contour_plots1 + contour_plots2 + contour_plots3) /  (contour_plots4 + contour_plots5 + contour_plots6) + plot_layout(guides = "collect")
+contour_plots7 <- ggplot(list_of_dfs_tidy[[7]], aes(PC1, PC2, z = density)) +
+  geom_contour(
+    aes(z = density,
+        color = after_stat(level)),
+    bins = 10,
+    size = 0.5
+  ) +
+  scale_color_viridis() +
+  geom_point(data = taxa.df, aes(x = PC1, y = PC2), inherit.aes = FALSE, color = "grey", alpha = 0.3) +
+  labs(
+    title = list_of_dfs_tidy[[7]]$project,
+    x = "PC1",
+    y = "PC2",
+    fill = "Density"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    panel.grid = element_blank(),
+    strip.background = element_rect(fill = "grey95", colour = NA),
+    strip.text = element_text(face = "bold", size = 10)
+  )
+contour_plots7
 
-contour.plots
+contour.plots.density <- (contour_plots1 + contour_plots2 + contour_plots3) /  (contour_plots4 + contour_plots5 + contour_plots6) + plot_layout(guides = "collect")
+
+contour.plots.density
+
+
+
+
+
+
+
+
+### run KDE function for each project
+kde_by_proj <- df_long %>%
+  group_by(project) %>%
+  group_modify(~ {
+    x <- .x$PC1
+    y <- .x$PC2
+    w <- .x$biomass
+    
+    kde <- weighted_kde2d(x, y, w, n = 200)
+    
+    expand.grid(
+      PC1 = kde$x,
+      PC2 = kde$y
+    ) %>%
+      mutate(biomass = as.vector(kde$z))
+  }) %>%
+  ungroup()
+
+
+### plot for each project
+list_of_dfs_tidy <- kde_by_proj %>%
+  group_by(project) %>%
+  group_split()
+
+
+
+### create contour plots
+
+contour_plots1 <- ggplot(list_of_dfs_tidy[[1]], aes(PC1, PC2, z = biomass)) +
+  geom_contour(
+    aes(z = biomass,
+        color = after_stat(level)),
+    bins = 8,
+    size = 0.5
+  ) +
+  scale_color_viridis() +
+  geom_point(data = taxa.df, aes(x = PC1, y = PC2), inherit.aes = FALSE, color = "grey", alpha = 0.3) +
+  labs(
+    title = list_of_dfs_tidy[[1]]$project,
+    x = "PC1",
+    y = "PC2",
+    fill = "Biomass"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    panel.grid = element_blank(),
+    strip.background = element_rect(fill = "grey95", colour = NA),
+    strip.text = element_text(face = "bold", size = 10)
+  )
+contour_plots1
+
+
+contour_plots2 <- ggplot(list_of_dfs_tidy[[2]], aes(PC1, PC2, z = biomass)) +
+  geom_contour(
+    aes(z = biomass,
+        color = after_stat(level)),
+    bins = 8,
+    size = 0.5
+  ) +
+  scale_color_viridis() +
+  geom_point(data = taxa.df, aes(x = PC1, y = PC2), inherit.aes = FALSE, color = "grey", alpha = 0.3) +
+  labs(
+    title = list_of_dfs_tidy[[2]]$project,
+    x = "PC1",
+    y = "PC2",
+    fill = "Biomass"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    panel.grid = element_blank(),
+    strip.background = element_rect(fill = "grey95", colour = NA),
+    strip.text = element_text(face = "bold", size = 10)
+  )
+contour_plots2
+
+contour_plots3 <- ggplot(list_of_dfs_tidy[[3]], aes(PC1, PC2, z = biomass)) +
+  geom_contour(
+    aes(z = biomass,
+        color = after_stat(level)),
+    bins = 8,
+    size = 0.5
+  ) +
+  scale_color_viridis() +
+  geom_point(data = taxa.df, aes(x = PC1, y = PC2), inherit.aes = FALSE, color = "grey", alpha = 0.3) +
+  labs(
+    title = list_of_dfs_tidy[[3]]$project,
+    x = "PC1",
+    y = "PC2",
+    fill = "Biomass"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    panel.grid = element_blank(),
+    strip.background = element_rect(fill = "grey95", colour = NA),
+    strip.text = element_text(face = "bold", size = 10)
+  )
+contour_plots3
+
+contour_plots4 <- ggplot(list_of_dfs_tidy[[4]], aes(PC1, PC2, z = biomass)) +
+  geom_contour(
+    aes(z = biomass,
+        color = after_stat(level)),
+    bins = 8,
+    size = 0.5
+  ) +
+  scale_color_viridis() +
+  geom_point(data = taxa.df, aes(x = PC1, y = PC2), inherit.aes = FALSE, color = "grey", alpha = 0.3) +
+  labs(
+    title = list_of_dfs_tidy[[4]]$project,
+    x = "PC1",
+    y = "PC2",
+    fill = "Biomass"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    panel.grid = element_blank(),
+    strip.background = element_rect(fill = "grey95", colour = NA),
+    strip.text = element_text(face = "bold", size = 10)
+  )
+
+contour_plots4
+x <- list_of_dfs_tidy[[5]]
+contour_plots5 <- ggplot(list_of_dfs_tidy[[5]], aes(PC1, PC2, z = biomass)) +
+  geom_contour(
+    aes(z = biomass,
+        color = after_stat(level)),
+    bins = 10,
+    size = 0.5
+  ) +
+  scale_color_viridis() +
+  geom_point(data = taxa.df, aes(x = PC1, y = PC2), inherit.aes = FALSE, color = "grey", alpha = 0.3) +
+  labs(
+    title = list_of_dfs_tidy[[5]]$project,
+    x = "PC1",
+    y = "PC2",
+    fill = "Biomass"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    panel.grid = element_blank(),
+    strip.background = element_rect(fill = "grey95", colour = NA),
+    strip.text = element_text(face = "bold", size = 10)
+  )
+contour_plots5
+
+contour_plots6 <- ggplot(list_of_dfs_tidy[[6]], aes(PC1, PC2, z = biomass)) +
+  geom_contour(
+    aes(z = biomass,
+        color = after_stat(level)),
+    bins = 10,
+    size = 0.5
+  ) +
+  scale_color_viridis() +
+  geom_point(data = taxa.df, aes(x = PC1, y = PC2), inherit.aes = FALSE, color = "grey", alpha = 0.3) +
+  labs(
+    title = list_of_dfs_tidy[[6]]$project,
+    x = "PC1",
+    y = "PC2",
+    fill = "Biomass"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    panel.grid = element_blank(),
+    strip.background = element_rect(fill = "grey95", colour = NA),
+    strip.text = element_text(face = "bold", size = 10)
+  )
+contour_plots6
+
+contour_plots7 <- ggplot(list_of_dfs_tidy[[7]], aes(PC1, PC2, z = biomass)) +
+  geom_contour(
+    aes(z = biomass,
+        color = after_stat(level)),
+    bins = 10,
+    size = 0.5
+  ) +
+  scale_color_viridis() +
+  geom_point(data = taxa.df, aes(x = PC1, y = PC2), inherit.aes = FALSE, color = "grey", alpha = 0.3) +
+  labs(
+    title = list_of_dfs_tidy[[7]]$project,
+    x = "PC1",
+    y = "PC2",
+    fill = "Biomass"
+  ) +
+  theme_bw(base_size = 12) +
+  theme(
+    panel.grid = element_blank(),
+    strip.background = element_rect(fill = "grey95", colour = NA),
+    strip.text = element_text(face = "bold", size = 10)
+  )
+contour_plots7
+
+contour.plots.biomass <- (contour_plots1 + contour_plots2 + contour_plots3) /  (contour_plots4 + contour_plots5 + contour_plots6) + plot_layout(guides = "collect")
+
+contour.plots.biomass
+
+
+contour.plots.all <- contour.plots.density | contour.plots.biomass
+
+ggsave(contour.plots.all, file = "contour.plots.all.png", width = 16, height = 10)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 model1 <- brm(abundance ~ PC1 + PC2 + (1|project), family = "negbinomial", data = traitsxcomms,
               cores = 4, chains = 4, backend = "cmdstanr")
