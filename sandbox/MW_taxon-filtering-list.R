@@ -8,8 +8,7 @@
 
 ### load necessary libraries ---
 # install.packages("librarian")
-librarian::shelf(tidyverse, FSA, readr, forcats, multcompView, readxl, dplyr, broom, ggpubr, lme4,
-                 patchwork, splitstackshape, ggimage, purrr, zoo, pracma, vegan, e1071, codyn, lubridate, forecast)
+librarian::shelf(tidyverse, janitor)
 
 ### set simple workflow functions ---
 nacheck <- function(df) {
@@ -44,7 +43,7 @@ zooplankton_classes <- spp_master |>
             "Insecta", "Arachnida", "Diplopoda"
       ))
 
-dt1 <- dt |>
+dt <- spp_master |>
       mutate(
             taxon_group = case_when(
                   class %in% bird_classes ~ "birds",
@@ -58,7 +57,6 @@ dt1 <- dt |>
             )
       )
 
-# ---- project -> allowed taxon groups ----
 proj_allowed <- list(
       "Arctic"      = c("zooplankton", "birds"),
       "Palmer"      = c("zooplankton", "birds"),
@@ -66,26 +64,49 @@ proj_allowed <- list(
       "FISHGLOB"    = c("fishes"),
       "FCE"         = c("fishes"),
       "SBC"         = c("fishes", "birds"),
-      "CoastalCA"   = c("fishes"),
+      "CoastalCA"   = c("fishes", "other_invertebrates"),
       "MCR"         = c("fishes"),
       "NGA"         = c("zooplankton"),
       "VCR"         = c("fishes"),
       "KBS_AMP"     = c("amphibians"),
       "KBS_BIR"     = c("birds"),
-      "KBS_INS"     = c("insects"),
+      "KBS_INS"     = c("insects", 'other'),
       "KBS_MAM"     = c("mammals"),
       "HARVARD"     = c("birds"),
       "SEV"         = c("mammals"),
       "MOHONK"      = c("birds", "mammals"),
-      "KONZA"       = c("insects", "mammals")
+      "KONZA"       = c("insects", "mammals"),
+      "PIE"         = c("fishes"),
+      "RLS"         = c("fishes"),
+      "SBC_BEACH"   = c('birds')
 )
 
-# ---- filter ----
-dt1 <- dt1 |>
-      mutate(allowed = purrr::map(project, ~ proj_allowed[[.x]])) |>
-      filter(!purrr::map_lgl(allowed, is.null)) |>
-      filter(purrr::map2_lgl(taxon_group, allowed, ~ .x %in% .y)) |>
+dt1 <- dt |>
+      ### looks up which taxon groups are allowed for each project
+      mutate(allowed = map(project, ~ proj_allowed[[.x]])) |>
+      ### filters those not allowed
+      filter(!map_lgl(allowed, is.null)) |>
+      ### keep only rows that meet allowed groups for each project
+      filter(map2_lgl(taxon_group, allowed, ~ .x %in% .y)) |>
+      ### clean up dataframe
       select(-allowed)
 
-# quick check
-test <- dt1 |> count(project, taxon_group) |> arrange(project, desc(n))
+removed <- anti_join(dt, dt1)
+glimpse(removed)
+
+acceptable <- removed |> 
+      filter(project %in% c('KBS_AMP', 'KBS_BIR', 'KBS_MAM', 'HARVARD',
+                            'KONZA', 'SEV')) |> 
+      mutate(taxon_group = case_when(
+            project == 'KBS_AMP' ~ "amphibians",
+            project == 'KBS_BIR' ~ "birds",
+            project == 'KBS_MAM' ~ "mammals",
+            project == 'HARVARD' ~ "birds",
+            project == 'KONZA' ~ "insects",
+            project == 'SEV' ~ "mammals",
+            TRUE ~ NA_character_
+      ))
+      
+dt2 <- rbind(dt1, acceptable)
+
+test <- dt2 |> count(project, taxon_group) |> arrange(project, desc(n))
