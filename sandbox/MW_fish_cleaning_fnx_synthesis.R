@@ -130,10 +130,10 @@ dt2 <- dt1 |>
                     year, month, total_n_area, total_p_area, total_bm_area)
 glimpse(dt2)
 
-dt2a <- dt1 |>
+dt2a1 <- dt1 |>
       filter(project == 'MCR') |> 
       group_by(project, habitat, year, month, scientific_name,
-               site, subsite_level1, subsite_level2, subsite_level3) |> 
+               site, subsite_level1, subsite_level2) |> 
       summarize(
             ### calculate total nitrogen supply at each sampling unit and then sum to get column with all totals
             total_nitrogen_m = sum(nind_ug_hr * density, na_rm = TRUE),
@@ -168,7 +168,7 @@ dt2c <- dt2b |>
             system = case_when(
                   project == 'SBC' & habitat == 'ocean' ~ site,
                   project == 'FCE' ~ paste(site, subsite_level1, sep = ''),
-                  project == 'MCR' ~ paste(subsite_level1, subsite_level2, sep = ''),
+                  project == 'MCR' ~ paste(subsite_level1, site, sep = ''),
                   project == 'COASTAL_CEN' ~ subsite_level2,
                   project == 'COASTAL_SOUTH' ~ subsite_level2)
       ) |> 

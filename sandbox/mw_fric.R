@@ -123,10 +123,8 @@ glimpse(dt1)
 dt2 <- dt1 |>
       filter(project != 'MCR') |> 
       group_by(project, habitat, year, month,
-               site, subsite_level1, subsite_level2, subsite_level3) |> 
+               site, subsite_level1, subsite_level2, subsite_level3, scientific_name) |> 
       summarize(
-            species_richness = n_distinct(scientific_name[dmperind_g_ind!=0]),
-            species_richness_area = species_richness/area,
             ### calculate total nitrogen supply at each sampling unit and then sum to get column with all totals
             total_nitrogen_m = sum(nind_ug_hr * density, na_rm = TRUE),
             total_nitrogen_m2 = sum(nind_ug_hr * density, na_rm = TRUE),
@@ -145,21 +143,18 @@ dt2 <- dt1 |>
             # total_bm_m3 = sum(dmperind_g_ind*ind_density_num, na_rm = TRUE),
             ### create column with total_biomass for each program, regardless of units
             total_bm_area = coalesce(total_bm_m, total_bm_m2),
-            density = sum(dens)) |>  
+            density = sum(density)) |>  
       ungroup() |> 
       arrange(project, year) |> 
       dplyr::select(project, habitat, site, subsite_level1, subsite_level2, subsite_level3,
-                    year, month, total_n_area, total_p_area, total_bm_area, species_richness,
-                    species_richness_area)
+                    year, month, total_n_area, total_p_area, total_bm_area, density, scientific_name)
 glimpse(dt2)
 
 dt2a <- dt1 |>
       filter(project == 'MCR') |> 
       group_by(project, habitat, year, month,
-               site, subsite_level1, subsite_level2) |> 
+               site, subsite_level1, subsite_level2, subsite_level3, scientific_name) |> 
       summarize(
-            species_richness = n_distinct(scientific_name[dmperind_g_ind!=0]),
-            species_richness_area = species_richness/300,
             ### calculate total nitrogen supply at each sampling unit and then sum to get column with all totals
             total_nitrogen_m = sum(nind_ug_hr * density, na_rm = TRUE),
             total_nitrogen_m2 = sum(nind_ug_hr * density, na_rm = TRUE),
@@ -178,34 +173,84 @@ dt2a <- dt1 |>
             # total_bm_m3 = sum(dmperind_g_ind*ind_density_num, na_rm = TRUE),
             ### create column with total_biomass for each program, regardless of units
             total_bm_area = coalesce(total_bm_m, total_bm_m2),
+            density = sum(density),
             subsite_level3 = 'Not Available') |>  
       ungroup() |> 
       arrange(project, year) |> 
       dplyr::select(project, habitat, site, subsite_level1, subsite_level2, subsite_level3,
-                    year, month, total_n_area, total_p_area, total_bm_area, species_richness, 
-                    species_richness_area)
+                    year, month, total_n_area, total_p_area, total_bm_area, density, scientific_name)
 glimpse(dt2a)
 dt2b <- rbind(dt2, dt2a)
+
+dt2c <- dt2b |>
+      arrange(project, year) |>
+      mutate(
+            system = case_when(
+                  project == 'SBC' & habitat == 'ocean' ~ site,
+                  project == 'FCE' ~ paste(site, subsite_level1, sep = ''),
+                  project == 'MCR' ~ paste(subsite_level1, site, sep = ''),
+                  project == 'COASTAL_CEN' ~ subsite_level2,
+                  project == 'COASTAL_SOUTH' ~ subsite_level2)
+      ) |> 
+      select(project, habitat, site, year, month, system, scientific_name, total_n_area, total_p_area,
+             total_bm_area, density)
+glimpse(dt2c)
 
 traits <- read_csv('../Collaborative/FnxSynthBase/consumer-trait-species-imputed-taxonmic-database.csv') |> 
       select(phylum, order, family, genus, scientific_name,
              age_life.span_years, diet_trophic.level_num, mass_adult_g,
              reproduction_reproductive.rate_num.offspring.per.clutch.or.litter) |> 
       distinct()
+
 glimpse(traits)
 
-all <- dt2b |> left_join()
+all <- dt2c |> left_join(traits)
+glimpse(all)
 
-# dt2c <- dt2b |> 
-#       arrange(project, year) |> 
-#       mutate(
-#             system = case_when(
-#                   project == 'SBC' & habitat == 'ocean' ~ site,
-#                   project == 'FCE' ~ paste(site, subsite_level1, sep = ''),
-#                   project == 'MCR' ~ paste(subsite_level1, site, sep = ''),
-#                   project == 'COASTAL_CEN' ~ subsite_level2,
-#                   project == 'COASTAL_SOUTH' ~ subsite_level2)
-#       ) |> 
+traits <- all |>
+      select(scientific_name,
+             age_life.span_years,
+             diet_trophic.level_num,
+             mass_adult_g,
+             reproduction_reproductive.rate_num.offspring.per.clutch.or.litter) |>
+      distinct() |>
+      group_by(scientific_name) |>
+      summarize(across(everything(), ~ first(na.omit(.x))), .groups = "drop") |>
+      column_to_rownames("scientific_name")
+
+comm <- all |>
+      group_by(project, habitat, site,
+               subsite_level1, subsite_level2, subsite_level3,
+               scientific_name) |>
+      summarize(abund = sum(density, na.rm = TRUE),
+                .groups = "drop") |>
+      tidyr::pivot_wider(names_from = scientific_name,
+                         values_from = abund,
+                         values_fill = 0)
+
+meta <- comm |>
+      select(project, habitat, site,
+             subsite_level1, subsite_level2, subsite_level3)
+
+comm_mat <- comm |>
+      select(-project, -habitat, -site,
+             -subsite_level1, -subsite_level2, -subsite_level3) |>
+      as.matrix()
+
+common_species <- intersect(colnames(comm_mat), rownames(traits))
+comm_mat <- comm_mat[, common_species]
+traits <- traits[common_species, ]
+
+dist_mat <- mFD::funct.dist(
+      sp_tr = traits,
+      tr_cat = rep("Q", ncol(traits)),
+      metric = "gower",
+      scale_euclid = "scale_center",
+      ordinal_var   = "classic",
+      weight_type   = "equal"
+)
+
+
 #       select(project, habitat, year, month, system, total_n_area, total_p_area, total_bm_area, species_richness, species_richness_area) |> 
 #       group_by(project, habitat, year, system) |> 
 #       summarize(across(total_n_area:species_richness_area, ~mean(.x, na.rm = TRUE)),
