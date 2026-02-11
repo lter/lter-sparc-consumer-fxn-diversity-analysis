@@ -201,6 +201,9 @@ rm(list = ls()); gc()
 all_traits <- readRDS(file.path("transformed_data", "sp_tr_zscore.rds"))
 
 
+#all_traits.verts$n_nas <- rowSums(is.na(all_traits.verts[,grep(pattern = "tr.", x = colnames(all_traits.verts))]))
+all_traits$n_nas <- rowSums(is.na(all_traits[,grep(pattern = ".zp", x = colnames(all_traits))]))
+
 
 # Reduce the project trait dataframe to species with tr data complete:
 all_traits.verts <- all_traits %>% filter(taxa %in% c("Fish","Amphibians","Mammals"))
