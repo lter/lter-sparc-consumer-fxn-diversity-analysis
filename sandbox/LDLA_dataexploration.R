@@ -225,7 +225,7 @@ onlytraits <- data.frame(all_traits.final %>% ungroup() %>% select(ends_with(".z
 rownames(onlytraits) <- all_traits.final$sp.proj
 #colnames(onlytraits) <- c("tr.age.zp", "tr.trophic.level.zp", "tr.reproductive.rate.zp", "tr.mass.adult.zp", "tr.active.time" )
 
-onlytraits.nat <- onlytraits %>% select(-tr.active.time,  -tr.reproductive.rate.zp, -tr.length.adult.zp)
+onlytraits.nat <- onlytraits %>% select(-tr.fecundity.zp, -tr.active.time,  -tr.reproductive.rate.zp, -tr.length.adult.zp)
 
 
 # # Build a dataframe gathering traits categories:
