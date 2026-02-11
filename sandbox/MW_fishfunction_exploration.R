@@ -159,7 +159,6 @@ dt2a <- dt1 |>
       dplyr::select(project, habitat, scientific_name, site, subsite_level1, subsite_level2, subsite_level3,
                     year, month, total_n_area, total_p_area, total_bm_area)
 glimpse(dt2a)
-
 dt2b <- rbind(dt2, dt2a)
 
 dt2c <- dt2b |> 
@@ -172,7 +171,5 @@ dt2c <- dt2b |>
                   project == 'COASTAL_CEN' ~ subsite_level2,
                   project == 'COASTAL_SOUTH' ~ subsite_level2)
       ) |> 
-      select(project, habitat, year, month, system, scientific_name, total_n_area, total_p_area, total_bm_area)
-
-write_csv(dt2c, '../Collaborative/FnxSynthBase/cleanfishdataforfnx.csv')
-glimpse(dt2c)
+      select(project, habitat, year, month, system, scientific_name, 
+             total_n_area, total_p_area, total_bm_area)
