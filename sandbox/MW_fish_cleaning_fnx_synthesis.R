@@ -21,7 +21,7 @@ nacheck <- function(df) {
 
 ### load necessary libraries
 # install.packages("librarian")
-librarian::shelf(tidyverse, dplyr, splitstackshape, janitor, readr, readxl)
+librarian::shelf(tidyverse, dplyr, splitstackshape)
 
 ### read in clean excretion and strata data from google drive
 dt <- read_csv("../Collaborative/FnxSynthBase/04_harmonized_consumer_excretion_sparc_cnd_site.csv") |> 
@@ -93,10 +93,8 @@ dt1 <- dt |>
       mutate(count = case_when(
             count == 0 ~ 1,
             TRUE ~ count
-      )) |> 
-      filter(count < 1000)
+      )) 
 
-unique(dt1$habitat)
 unique(dt1$phylum)
 unique(dt1$project)
 unique(dt1$scientific_name)
@@ -105,10 +103,9 @@ glimpse(dt1)
 
 dt2 <- dt1 |>
       filter(project != 'MCR') |> 
-      group_by(project, habitat, year, month,
+      group_by(project, habitat, year, month, scientific_name,
                site, subsite_level1, subsite_level2, subsite_level3) |> 
       summarize(
-            species_richness = n_distinct(scientific_name[dmperind_g_ind!=0]),
             ### calculate total nitrogen supply at each sampling unit and then sum to get column with all totals
             total_nitrogen_m = sum(nind_ug_hr * density, na_rm = TRUE),
             total_nitrogen_m2 = sum(nind_ug_hr * density, na_rm = TRUE),
@@ -129,16 +126,15 @@ dt2 <- dt1 |>
             total_bm_area = coalesce(total_bm_m, total_bm_m2)) |>  
       ungroup() |> 
       arrange(project, year) |> 
-      dplyr::select(project, habitat, site, subsite_level1, subsite_level2, subsite_level3,
-                    year, total_n_area, total_p_area, total_bm_area, species_richness)
+      dplyr::select(project, habitat, scientific_name, site, subsite_level1, subsite_level2, subsite_level3,
+                    year, total_n_area, total_p_area, total_bm_area)
 glimpse(dt2)
 
 dt2a <- dt1 |>
       filter(project == 'MCR') |> 
-      group_by(project, habitat, year, month,
-               site, subsite_level1, subsite_level2) |> 
+      group_by(project, habitat, year, month, scientific_name,
+               site, subsite_level1, subsite_level2, subsite_level3) |> 
       summarize(
-            species_richness = n_distinct(scientific_name[dmperind_g_ind!=0]),
             ### calculate total nitrogen supply at each sampling unit and then sum to get column with all totals
             total_nitrogen_m = sum(nind_ug_hr * density, na_rm = TRUE),
             total_nitrogen_m2 = sum(nind_ug_hr * density, na_rm = TRUE),
@@ -160,8 +156,8 @@ dt2a <- dt1 |>
             subsite_level3 = 'Not Available') |> 
       ungroup() |> 
       arrange(project, year) |> 
-      dplyr::select(project, habitat, site, subsite_level1, subsite_level2, subsite_level3,
-                    year, total_n_area, total_p_area, total_bm_area, species_richness)
+      dplyr::select(project, habitat, scientific_name, site, subsite_level1, subsite_level2, subsite_level3,
+                    year, total_n_area, total_p_area, total_bm_area)
 glimpse(dt2a)
 
 dt2b <- rbind(dt2, dt2a)
@@ -176,7 +172,17 @@ dt2c <- dt2b |>
                   project == 'COASTAL_CEN' ~ subsite_level2,
                   project == 'COASTAL_SOUTH' ~ subsite_level2)
       ) |> 
-      group_by(project, habitat, system, year) |> 
-      summarize(across(total_n_area:species_richness, ~mean(.x, na.rm = TRUE)),
-                .groups = 'drop') |> 
-      distinct()
+      distinct() |> 
+      select(project, habitat, year, system, scientific_name, total_n_area, total_p_area, total_bm_area) |> 
+      group_by(project, habitat, system) |> 
+      complete(
+            year, scientific_name,
+            fill = list(
+                  total_n_area = 0,
+                  total_p_area = 0,
+                  total_bm_area = 0
+            )
+      ) |> 
+      ungroup()
+write_csv(dt2c, '../Collaborative/FnxSynthBase/cleanfishdataforfnx.csv')
+glimpse(dt2c)
