@@ -391,6 +391,13 @@ p2rep <- ggplot(taxa.df, aes(x = PC1, y = PC2)) +
   theme_bw()
 p2rep
 
+p2time <- ggplot(taxa.df, aes(x = PC1, y = PC2)) +
+  geom_point(aes(color = tr.active.time, shape = taxa), size = 2) +
+  geom_polygon(data = taxa.df.hulls, aes(lty = taxa), color = "black", fill = NA) +
+  scale_color_viridis_d() +
+  theme_bw() + facet_wrap(~taxa)
+p2time
+
 
 p2s <- p2mass / p2trophic /p2age + plot_layout(guides = "collect")
 p2s
@@ -582,6 +589,184 @@ p2s.t <- p2mass.t / p2trophic.t /p2age.t
 p2s.t
 
 
+
+# 5 - Raw traits ===================================================
+
+
+#onlytraits <- data.frame(all_traits.final %>% ungroup() %>% select(starts_with("tr.")) %>% mutate(tr.active.time=as.factor(tr.active.time)))
+onlytraits.raw <- data.frame(all_traits.final %>% ungroup() %>% select(age_life.span_years, diet_trophic.level_num, reproduction_reproductive.rate_num.offspring.per.year, mass_adult_g)
+
+# everything needs to be log10 transformed
+hist(log10(onlytraits.raw$age_life.span_years))
+hist(log10(onlytraits.raw$mass_adult_g))
+hist(log10(onlytraits.raw$reproduction_reproductive.rate_num.offspring.per.year))
+hist(log10(onlytraits.raw$diet_trophic.level_num))
+
+onlytraits.raw$log.age <- log10(onlytraits.raw$age_life.span_years)
+onlytraits.raw$log.mass <- log10(onlytraits.raw$mass_adult_g)
+onlytraits.raw$log.diet <- log10(onlytraits.raw$diet_trophic.level_num)
+onlytraits.raw$log.reproduction <- log10(onlytraits.raw$reproduction_reproductive.rate_num.offspring.per.year)
+
+onlytraits.rawlog <- onlytraits.raw[,grep("log", colnames(onlytraits.raw))]
+
+
+
+rownames(onlytraits.rawlog) <- all_traits.final$sp.proj
+#colnames(onlytraits) <- c("tr.age.zp", "tr.trophic.level.zp", "tr.reproductive.rate.zp", "tr.mass.adult.zp", "tr.active.time" )
+
+
+
+
+
+# Compute functional distance:
+sp_dist_all.r <- mFD::funct.dist(
+  sp_tr         = onlytraits.rawlog,
+  tr_cat        = tr_cat_df,
+  metric        = "gower",
+  scale_euclid  = "noscale",
+  ordinal_var   = "classic",
+  weight_type   = "equal",
+  stop_if_NA    = FALSE)
+dist_df <- mFD::dist.to.df(list("df" = sp_dist_all.r))
+
+# Build functional space - check quality dimensions:
+fspaces_quality_all.r <- mFD::quality.fspaces(
+  sp_dist             = sp_dist_all.r,
+  maxdim_pcoa         = 10,
+  deviation_weighting = "absolute",
+  fdist_scaling       = FALSE,
+  fdendro             = "average")
+mFD::quality.fspaces.plot(
+  fspaces_quality            = fspaces_quality_all.r,
+  quality_metric             = "mad",
+  fspaces_plot               = c("tree_average", "pcoa_2d", "pcoa_3d", 
+                                 "pcoa_4d"))
+
+# Get species coordinates:
+sp_faxes_coord_all.r <- fspaces_quality_all.r$"details_fspaces"$"sp_pc_coord"
+
+
+# Get link between axes and traits:
+all_tr_faxes.r <- mFD::traits.faxes.cor(
+  sp_tr          = onlytraits.rawlog, 
+  sp_faxes_coord = sp_faxes_coord_all.r[ , c("PC1", "PC2", "PC3")], 
+  plot           = TRUE, 
+  stop_if_NA = FALSE)
+all_tr_faxes.r
+
+# Plot functional space:
+fctsp_all.r <- mFD::funct.space.plot(
+  sp_faxes_coord  = sp_faxes_coord_all.r[ , c("PC1", "PC2", "PC3")],
+  faxes           = c("PC1", "PC2", "PC3"),
+  name_file       = NULL,
+  faxes_nm        = NULL,
+  range_faxes     = c(NA, NA),
+  color_bg        = "grey95",
+  color_pool      = "#53868B",
+  fill_pool       = "white",
+  shape_pool      = 21,
+  size_pool       = 1,
+  plot_ch         = TRUE,
+  color_ch        = "#EEAD0E",
+  fill_ch         = "white",
+  alpha_ch        = 0.5,
+  plot_vertices   = TRUE,
+  color_vert      = "#EEAD0E",
+  fill_vert       = "#EEAD0E",
+  shape_vert      = 23,
+  size_vert       = 1,
+  plot_sp_nm      = NULL,
+  nm_size         = 3,
+  nm_color        = "black",
+  nm_fontface     = "plain",
+  check_input     = TRUE)
+fctsp_all.r
+
+# ----- Reattach metadata to ordination space dataframe ---------
+
+colnames(sp_faxes_coord_all.r) <- paste(colnames(sp_faxes_coord_all.r), "r",sep=".")
+
+sp.faxes.raw <- data.frame(sp_faxes_coord_all.r) %>% mutate(sp.proj=rownames(.))
+
+
+taxa.df.t.raw <- taxa.df.t %>%
+  left_join(sp.faxes.raw) 
+
+taxa.all <- cbind(taxa.df.t.raw, onlytraits.rawlog)
+
+
+# 5.2 - Visualize ordination space ===================================================
+
+library(patchwork)
+library(viridis)
+
+taxa.df.hulls.r <- taxa.all %>%
+  group_by(taxa) %>%
+  slice(chull(PC1.r, PC2.r))
+
+p2age.r <- ggplot(taxa.all, aes(x = PC1.r, y = PC2.r)) +
+  geom_point(aes(fill = tr.age.zp, shape = taxa), size = 2) +
+  geom_polygon(data = taxa.df.hulls.r, aes(lty = taxa), color = "black", fill = NA) +
+  scale_fill_viridis() +
+  scale_shape_manual(values = 21:23) +
+  theme_bw() +
+  labs(fill = "z-Age", shape = "Taxon", lty = "Taxon")
+p2age.r 
+
+
+p2trophic.r <- ggplot(taxa.all, aes(x = PC1.r, y = PC2.r)) +
+  geom_point(aes(fill = tr.trophic.level.zp, shape = taxa), size = 2) +
+  geom_polygon(data = taxa.df.hulls.r, aes(lty = taxa), color = "black", fill = NA) +
+  scale_fill_viridis() +
+  scale_shape_manual(values = 21:23) +
+  theme_bw() +
+  labs(fill = "z-Trophic level", shape = "Taxon", lty = "Taxon")
+p2trophic
+
+
+p2mass.r <- ggplot(taxa.all, aes(x = PC1.r, y = PC2.r)) +
+  geom_point(aes(fill = tr.mass.adult.zp, shape = taxa), size = 2) +
+  geom_polygon(data = taxa.df.hulls.r, aes(lty = taxa), color = "black", fill = NA) +
+  scale_fill_viridis() +
+  scale_shape_manual(values = 21:23) +
+  theme_bw() +
+  labs(fill = "z-Mass", shape = "Taxon", lty = "Taxon")
+p2mass.r
+
+
+p2rep.r <- ggplot(taxa.all, aes(x = PC1.r, y = PC2.r)) +
+  geom_point(aes(fill = tr.reproductive.rate.zp, shape = taxa), size = 2) +
+  geom_polygon(data = taxa.df.hulls.r, aes(lty = taxa), color = "black", fill = NA) +
+  scale_fill_viridis() +
+  scale_shape_manual(values = 21:23) +
+  theme_bw()
+p2rep.r
+
+p2time <- ggplot(taxa.df, aes(x = PC1, y = PC2)) +
+  geom_point(aes(color = tr.active.time, shape = taxa), size = 2) +
+  geom_polygon(data = taxa.df.hulls, aes(lty = taxa), color = "black", fill = NA) +
+  scale_color_viridis_d() +
+  theme_bw() + facet_wrap(~taxa)
+p2time
+
+
+p2s.r <- p2mass.r / p2trophic.r /p2age.r + plot_layout(guides = "collect")
+p2s.r
+
+
+
+
+
+# 6 - Compare Z-scores for duplicate spp ========================
+
+dups <- taxa.df.t[which(taxa.df.t$scientific_name %in% names(which(xtabs(~scientific_name, taxa.df.t)>1))),]
+
+ggplot(dups, aes(x=PC2, y=PC2.t, col=project)) + geom_point() + geom_abline(slope=-1)
+ggplot(dups, aes(x=PC2, y=PC2.t, col=project)) + geom_point() + geom_abline(slope=1)
+
+# no perfect, but not end of the world.
+
+ 
 
 
 #---------- poor attempts at exploring community patterns
