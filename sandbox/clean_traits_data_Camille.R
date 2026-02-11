@@ -115,39 +115,41 @@ program_sp_trt_data$age_life.span_years[which(program_sp_trt_data$age_life.span_
 # Create a new column for Taxa:
 program_sp_trt_data$taxa <- project.taxon$taxa[match(program_sp_trt_data$project, project.taxon$project)]
 
-# program_sp_trt_data1 <- program_sp_trt_data %>% 
-#   mutate(taxa = case_when(
-#     project == "CoastalCA" ~ "Fish",
-#     project == "FCE" ~ "Fish",
-#     project == "SBC" ~ "Fish",
-#     project == "MCR" ~ "Fish",
-#     project == "VCR" ~ "Fish",
-#     project == "RLS" ~ "Fish",
-#     project == "FISHGLOB" ~ "Fish",
-#     project == "KBS_MAM" ~ "Mammals",
-#     project == "SEV" ~ "Mammals",
-#     project == "MOHONK" ~ "Amphibians",
-#     project == "KBS_AMP" ~ "Amphibians",
-#     project %in% c("HARVARD", "KBS_BIR","SBC_BEACH") ~ "Birds",
-#     project %in% c("NGA","Arctic","Palmer","CCE","NorthLakes") ~ "Zooplankton",
-#     TRUE ~ NA
-#     )) %>% filter(!is.na(taxa), scientific_name!= "Homo sapiens") %>% 
-#   dplyr::mutate(taxa = factor(taxa))
+### NOT NEEDED UNTIL BIRDS/Zooplankton COME IN
+# calculate reproduction where needed
+missing.offspring <- which(is.na(program_sp_trt_data$reproduction_reproductive.rate_num.offspring.per.year))
+program_sp_trt_data$reproduction_reproductive.rate_num.offspring.per.year[missing.offspring] <- program_sp_trt_data$reproduction_reproductive.rate_num.litter.or.clutch.per.year[missing.offspring] * program_sp_trt_data$reproduction_reproductive.rate_num.offspring.per.clutch.or.litter[missing.offspring] 
 
 
-# all_traits <- program_sp_trt_data %>% 
-#   dplyr::select(c(1:9, 
-#                 "age_life.span_years",
-#                 "diet_trophic.level_num",
-#                 "reproduction_reproductive.rate_num.offspring.per.year",
-#                 "mass_adult_g",
-#                 "active.time_category_ordinal", "taxa")) %>%
-#   group_by(project) %>% mutate(tr.age.zp = scale(age_life.span_years)[,1],
-#                                tr.trophic.level.zp = scale(diet_trophic.level_num)[,1],
-#                                tr.reproductive.rate.zp = scale(reproduction_reproductive.rate_num.offspring.per.year)[,1],
-#                                tr.mass.adult.zp = scale(log(mass_adult_g, 10))[,1]
-#                                )
+# determine whether fecundity or offspring number is best reproductive variable per project
+# xtabs(~project, program_sp_trt_data[which(program_sp_trt_data$reproduction_fecundity_num>0),])
+# 
+# xtabs(~project, program_sp_trt_data[which(program_sp_trt_data$reproduction_reproductive.rate_num.offspring.per.year>0),])
 
+# offspring: 
+# KBS_AMPH
+
+# fecundity:
+# CoastalCA, FCE, KONZA, MCR, NGA, SBC, VCR, PIE, RLS
+
+# both: CCE, KBS_MAM, MOHONK, Palmer, SEV
+# NGA (use fecundity)? KONZA?
+# Palmer, no real data in either. identical.
+# KBS, SEV, Palmer, identical an none of them real at the moment.
+
+# check whether we need to consider reproduction and num.offspring
+repro_proj <- program_sp_trt_data %>% group_by(project, taxa) %>% summarise(
+  n.true.offspring = length(unique(reproduction_reproductive.rate_num.offspring.per.year[which(!is.na(reproduction_reproductive.rate_num.offspring.per.year))])),
+  n.true.fecundity = length(unique(reproduction_fecundity_num[which(!is.na(reproduction_fecundity_num))])), n.fecundity = length(which(!is.na(reproduction_fecundity_num))),
+  n.mass = length(which(!is.na(mass_adult_g)))
+    )
+# for Fish -> use fecundity
+# for Birds -> use num.offspring
+# for Zooplankton -> us XXXXXXXXX
+
+# 4 - z-score standardize  =========================
+
+# rename and z-score standardize
 all_traits <- program_sp_trt_data %>% filter(scientific_name !="Homo sapiens", taxa !="BAD") %>%
   dplyr::select(c(1:9, 
                   "age_life.span_years",
@@ -161,11 +163,17 @@ all_traits <- program_sp_trt_data %>% filter(scientific_name !="Homo sapiens", t
                                               NA, age_life.span_years)) %>% 
   dplyr::mutate(reproduction_fecundity_num = if_else(reproduction_fecundity_num < 0, 
                                                      NA, reproduction_fecundity_num)) %>% 
+  dplyr::mutate(reproduction.unified = case_when(
+    taxa %in% c("Fish", "Zooplnakton") ~ reproduction_fecundity_num,
+    taxa %in% c("Birds","Mammals") ~ reproduction_reproductive.rate_num.offspring.per.year,
+    T ~ NA
+  )) %>% 
   group_by(project) %>% 
   mutate(tr.age.zp = scale(age_life.span_years)[,1],
          tr.trophic.level.zp = scale(diet_trophic.level_num)[,1],
          tr.reproductive.rate.zp = scale(reproduction_reproductive.rate_num.offspring.per.year)[,1],
          tr.fecundity.zp = scale(reproduction_fecundity_num)[,1],
+         tr.reproduction.unified.zp = scale(reproduction.unified)[,1],
          tr.mass.adult.zp = scale(log(mass_adult_g, 10))[,1],
          tr.length.adult.zp = scale(log(length_adult_cm, 10))[,1]
   ) %>%
@@ -174,22 +182,48 @@ all_traits <- program_sp_trt_data %>% filter(scientific_name !="Homo sapiens", t
          tr.trophic.level.zt = scale(diet_trophic.level_num)[,1],
          tr.reproductive.rate.zt = scale(reproduction_reproductive.rate_num.offspring.per.year)[,1],
          tr.fecundity.zt = scale(reproduction_fecundity_num)[,1],
+         tr.reproduction.unified.zt = scale(reproduction.unified)[,1],
          tr.mass.adult.zt = scale(log(mass_adult_g, 10))[,1],
          tr.length.adult.zt = scale(log(length_adult_cm, 10))[,1]
   )
 
-# Order and create the Active time categories:
 
 
-# all_traits$tr.active.time <- all_traits %>% ungroup() %>% 
-#   dplyr::mutate(active.time_category_new = case_when(
-#     active.time_category_ordinal == "diurnal" ~ "diurnal",
-#     active.time_category_ordinal == "nocturnal" ~ "nocturnal",
-#     ! active.time_category_ordinal %in% c("diurnal", "nocturnal", "") ~ "cathemeral")) %>% 
-#   dplyr::select(active.time_category_new) %>% 
-#   dplyr::rename(tr.active.time = active.time_category_new)
 
-# ----
+
+
+
+
+
+# 5 - Trait QA/QC  =========================
+
+trait.checks <- all_traits %>% group_by(project, taxa) %>% summarise(
+  n.spp = n(),
+  n.spp.kingprob = length(which(is.na(kingdom))),
+  n.spp.classprob = length(which(is.na(class))),
+  n.mass = length(which(!is.na(tr.mass.adult.zt))),
+  n.unique.mass = length(unique(tr.mass.adult.zt[which(!is.na(tr.mass.adult.zt))])),
+  n.trophic = length(which(!is.na(tr.trophic.level.zt))),
+  n.unique.trophic = length(unique(tr.trophic.level.zt[which(!is.na(tr.trophic.level.zt))])),
+  n.age = length(which(!is.na(tr.age.zt))),
+  n.unique.age = length(unique(tr.age.zt[which(!is.na(tr.age.zt))])),
+  n.repro = length(which(!is.na(tr.reproduction.unified.zt))),
+  n.unique.repro = length(unique(tr.reproduction.unified.zt[which(!is.na(tr.reproduction.unified.zt))])),
+  )
+
+for(i in unique(all_traits$project)){
+  proj.dat <- all_traits %>% filter(project == i)
+  p1 <- ggplot(proj.dat, aes(x = PC1.t, y = PC2.t)) +
+    geom_point(aes(fill = tr.age.zt, shape = taxa), size = 2) +
+    geom_polygon(data = taxa.df.hulls.t, aes(lty = taxa), color = "black", fill = NA) +
+    scale_fill_viridis() +
+    scale_shape_manual(values = 21:23) +
+    theme_bw()
+  p2age.t
+}
+
+
+
 
 
 saveRDS(all_traits,
