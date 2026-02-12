@@ -34,11 +34,11 @@ sp_tr_zscore <- readRDS(file.path("transformed_data",
 
 # Subset it to tr and fish/birds/mammals/amphibians for now:
 sp_tr_df <- sp_tr_zscore %>% 
-  dplyr::filter(taxa %in% c("Birds", "Mammals", "Fish", "Amphibians")) %>% 
+  dplyr::filter(taxa %in% c("Birds", "Fish")) %>% 
   dplyr::select(c("scientific_name",
                   "tr.mass.adult.zt",
                   "tr.trophic.level.zt",
-                  "tr.fecundity.zt",
+                  "tr.reproduction.unified.zt",
                   "tr.age.zt")) %>% 
   dplyr::distinct() %>% 
   dplyr::ungroup() 
@@ -92,6 +92,9 @@ mFD::quality.fspaces.plot(
   x_lab                      = "Trait-based distance")
 
 sp_faxes_coord_df <- fspaces_quality$"details_fspaces"$"sp_pc_coord"
+saveRDS(sp_faxes_coord_df, 
+        file.path("transformed_data",
+                  "sp_faxes_coord.rds"))
 
 # Check correlation traits and axes:
 tr_faxes <- mFD::traits.faxes.cor(
@@ -99,7 +102,7 @@ tr_faxes <- mFD::traits.faxes.cor(
   sp_faxes_coord = sp_faxes_coord_df[ , c("PC1", "PC2", "PC3")], 
   stop_if_NA = FALSE,
   plot = TRUE)
-
+tr_faxes
 
 # 3 - Build the assemblage dataframe ===========================================
 
@@ -113,8 +116,8 @@ comm_df <- read.csv(file.path("Data",
 sp_comm_df <- read.csv(file.path("transformed_data",
                               "Mack_data.csv")) #system
 # Call species list:
-sp_list <- readRDS(file.path("transformed_data",
-                             "species_list_corrected_fish.rds"))
+# sp_list <- readRDS(file.path("transformed_data",
+#                              "species_list_corrected_fish.rds"))
 
 # Link comm and species list:
 #sp_comm_df <- dplyr::left_join(comm_df, dplyr::distinct(sp_list[, c(4,12)]),
@@ -192,9 +195,6 @@ alpha_fd_indices <- mFD::alpha.fd.multidim(
 ind_df <- alpha_fd_indices$functional_diversity_indices %>% 
   tibble::rownames_to_column(var = "samp_unit")
 
-# 5 - Plot variation through time ==============================================
-
-
 # Combine the df with fd indices and the comm_df2 which has info about proj:
 info_df <- sp_comm_df2 %>% 
   dplyr::select(-c("scientific_name")) %>% 
@@ -211,6 +211,10 @@ results_df <- ind_df %>%
 saveRDS(results_df,
         file.path("transformed_data",
                   "fd_ind_time.rds"))
+
+
+# 5 - Plot variation through time ==============================================
+
 
 # Pisco:
 results_df_Coastal <- results_df %>% 
@@ -391,5 +395,12 @@ fide2_plot_VCR <- ggplot2::ggplot(data = results_df_VCR,
   ggplot2::theme_bw() +
   ggplot2::ggtitle("Functional Identity PC2 - VCR")
 fide2_plot_VCR
+
+
+# 6 - Do FD in change through time ? ===========================================
+
+
+
+
 
 
