@@ -3,7 +3,7 @@
 ## Script to get traits data clean and z-transformed
 ##
 ## Camille Magneville
-##
+## - edits by Lee Anderegg
 ## 02/2026
 ##
 ################################################################################
@@ -38,9 +38,10 @@ spp_master <- readr::read_csv(file.path("Data","species_tidy-data", "23_species_
   janitor::clean_names()
 
 
-# 2 - Create a dataframe with species/hab/project/taxa =========================
 
-# . taxonomic cleaning ------------------------------------------------------------
+# 2 - Cleaning non-focal taxa  =========================
+
+
   # this was stolen directly from MW_taxon-filtering-list.R on 2.10.20
 
 
@@ -148,6 +149,7 @@ acceptable <- removed |>
 sp_list <- rbind(dt1, acceptable)
 
 
+# 3 - final random cleaning =========================
 
 # change NAs to be blanks
 sp_list_v2 <- sp_list %>%
@@ -183,7 +185,6 @@ sp_list_ready <- sp_list_v2 %>% distinct(sp.proj, .keep_all = T)
 
 
 
-# 3 - Cleaning non-focal taxa  =========================
 
 
 # #--- Clean Fish (may be deprecated if cleaned upstream in sp list)
@@ -261,44 +262,60 @@ program_sp_trt_data$reproduction_reproductive.rate_num.offspring.per.year[missin
 
 # 4 - z-score standardize  =========================
 
+# note on nomenclature:
+#prefix "tr.-" = a trait we're working with.
+#suffix = units/scale its in:
+#     -.g/.years/num = raw units
+#     -.unified = units of either fecundity or # offspring per year, depending on taxon
+#     -.zp - z-score standardized per project
+#     -.zt - z-score standardized per taxon
+#     -.log - log10-transformed raw traits.
+
+### NOTE: 
+#***** mass.adult, reproduciton.unified, and age.years are all log10-transformed prior to z-scoring
+
 # remove projects no longer in analysis:
 BAD <- c("KONZA","PIE","KBS_INS","MOHONK", "KBS_MAM", "KBS_BIR", "KBS_AMP")
 
 # rename and z-score standardize
 all_traits <- program_sp_trt_data %>% filter(!project %in% BAD) %>%
-  dplyr::select(c(1:12, 
-                  "age_life.span_years",
+  dplyr::select(c("project","habitat","taxon", "scientific_name","kingdom","class","order","family","genus","sp.proj","source","raw_filename",
+                  "tr.age.years"="age_life.span_years",
                   "length_adult_cm",
-                  "diet_trophic.level_num",
+                  "tr.trophic.level.num" = "diet_trophic.level_num",
                   "reproduction_reproductive.rate_num.offspring.per.year",
                   "reproduction_fecundity_num",
-                  "mass_adult_g",
-                  "tr.active.time" ="active.time_category_ordinal", "taxon")) %>%
-  dplyr::mutate(age_life.span_years = if_else(age_life.span_years <= 0,
-                                              NA, age_life.span_years)) %>% 
+                  "tr.mass.adult.g" = "mass_adult_g" ,
+                  "tr.active.time" ="active.time_category_ordinal")) %>%
+  dplyr::mutate(tr.age.years = if_else(tr.age.years <= 0,
+                                              NA, tr.age.years)) %>% 
   dplyr::mutate(reproduction_fecundity_num = if_else(reproduction_fecundity_num < 0, 
                                                      NA, reproduction_fecundity_num)) %>% 
-  dplyr::mutate(reproduction.unified = case_when(
+  dplyr::mutate(tr.reproduction.unified = case_when(
     taxon %in% c("Fish", "Zooplnakton") ~ reproduction_fecundity_num,
     taxon %in% c("Birds","Mammals", "Amphibians") ~ reproduction_reproductive.rate_num.offspring.per.year,
     T ~ NA
   )) %>% 
+  dplyr::mutate(tr.age.log = log10(tr.age.years),
+                tr.reproduction.unified.log = log10(tr.reproduction.unified),
+                tr.mass.adult.log = log10(tr.mass.adult.g)
+                ) %>%
   group_by(project) %>% 
-  mutate(tr.age.zp = scale(age_life.span_years)[,1],
-         tr.trophic.level.zp = scale(diet_trophic.level_num)[,1],
+  mutate(tr.age.zp = scale(log10(tr.age.years))[,1],
+         tr.trophic.level.zp = scale(tr.trophic.level.num)[,1],
          tr.reproductive.rate.zp = scale(reproduction_reproductive.rate_num.offspring.per.year)[,1],
          tr.fecundity.zp = scale(reproduction_fecundity_num)[,1],
-         tr.reproduction.unified.zp = scale(log(reproduction.unified,10))[,1],
-         tr.mass.adult.zp = scale(log(mass_adult_g, 10))[,1],
+         tr.reproduction.unified.zp = scale(log(tr.reproduction.unified,10))[,1],
+         tr.mass.adult.zp = scale(log(tr.mass.adult.g, 10))[,1],
          tr.length.adult.zp = scale(log(length_adult_cm, 10))[,1]
   ) %>%
   ungroup() %>% group_by(taxon) %>%
-  mutate(tr.age.zt = scale(age_life.span_years)[,1],
-         tr.trophic.level.zt = scale(diet_trophic.level_num)[,1],
+  mutate(tr.age.zt = scale(log10(tr.age.years))[,1],
+         tr.trophic.level.zt = scale(tr.trophic.level.num)[,1],
          tr.reproductive.rate.zt = scale(reproduction_reproductive.rate_num.offspring.per.year)[,1],
          tr.fecundity.zt = scale(reproduction_fecundity_num)[,1],
-         tr.reproduction.unified.zt = scale(log10(reproduction.unified))[,1],
-         tr.mass.adult.zt = scale(log(mass_adult_g, 10))[,1],
+         tr.reproduction.unified.zt = scale(log10(tr.reproduction.unified))[,1],
+         tr.mass.adult.zt = scale(log(tr.mass.adult.g, 10))[,1],
          tr.length.adult.zt = scale(log(length_adult_cm, 10))[,1]
   )
 
@@ -386,11 +403,11 @@ for(i in 1:length(unique(all_traits$project))){
 for(i in 1:length(unique(all_traits$project))){
   my.project <- unique(all_traits$project)[i]
   proj.dat <- all_traits %>% filter(project == my.project)
-  proj.dat$logmass <- log10(proj.dat$mass_adult_g)
-  proj.dat$logage <- log10(proj.dat$age_life.span_years)
-  proj.dat$logrepro <- log10(proj.dat$reproduction.unified)
+  # proj.dat$logmass <- log10(proj.dat$mass_adult_g)  # now calculate log10 in all_traits
+  # proj.dat$logage <- log10(proj.dat$age_life.span_years)
+  # proj.dat$logrepro <- log10(proj.dat$reproduction.unified)
   if(length(which(!is.na(proj.dat$tr.age.zt)))>2 & length(which(!is.na(proj.dat$tr.mass.adult.zt)))>2 ){
-    p1 <- plot_with_margins(proj.dat, x=logmass, y=logage, my.project)
+    p1 <- plot_with_margins(proj.dat, x=tr.mass.adult.log, y=tr.age.log, my.project)
     #print(p1)
   }
   if(length(which(!is.na(proj.dat$tr.age.zt)))<3 | length(which(!is.na(proj.dat$tr.mass.adult.zt)))<3 ){
@@ -398,7 +415,7 @@ for(i in 1:length(unique(all_traits$project))){
     #print(p1)
   }
   if(length(which(!is.na(proj.dat$tr.trophic.level.zt)))>2 & length(which(!is.na(proj.dat$tr.reproduction.unified.zt)))>2 ){
-    p2<- plot_with_margins(proj.dat, diet_trophic.level_num, logrepro, my.project)
+    p2<- plot_with_margins(proj.dat, tr.trophic.level.num, tr.reproduction.unified.log, my.project)
     #print(p2)
   }
   if(length(which(!is.na(proj.dat$tr.trophic.level.zt)))<3 | length(which(!is.na(proj.dat$tr.reproduction.unified.zt)))<3 ){
@@ -434,146 +451,3 @@ saveRDS(all_traits,
 
 
 
-# replaced with all-in-one code above. only creates sp_tr_zscore.rds 
-# 
-# 
-# # Add taxa to species list data:
-# # Create a new column for Taxa:
-# taxa_sp_list <- sp_list %>% 
-#   mutate(taxa = case_when(
-#     project == "CoastalCA" ~ "Fish",
-#     project == "FCE" ~ "Fish",
-#     project == "SBC" ~ "Fish",
-#     project == "MCR" ~ "Fish",
-#     project == "VCR" ~ "Fish",
-#     project == "RLS" ~ "Fish",
-#     project == "FISHGLOB" ~ "Fish",
-#     project == "KBS_MAM" ~ "Mammals",
-#     project == "SEV" ~ "Mammals",
-#     project == "MOHONK" ~ "Amphibians",
-#     project == "KBS_AMP" ~ "Amphibians",
-#     project %in% c("HARVARD", "KBS_BIR","SBC_BEACH") ~ "Birds",
-#     project %in% c("NGA","Arctic","Palmer","CCE","NorthLakes") ~ "Zooplankton")) %>% 
-#   dplyr::mutate(taxa = factor(taxa))
-# 
-# # Check that the NA are for insect projects and PIE and rm them:
-# unique(taxa_sp_list$project[which(is.na(taxa_sp_list$taxa))])
-# taxa_sp_list_final <- taxa_sp_list %>% 
-#   dplyr::filter(! is.na(taxa)) %>% 
-#   dplyr::select(c("project", "habitat",
-#                   "scientific_name", "taxa")) %>% 
-#   distinct()
-# 
-# saveRDS(taxa_sp_list_final,
-#         file.path("transformed_data", "proj_taxa_sp_list.rds"))
-# 
-# 
-# 4 - Clean the traits data and get completedness ==============================
-# 
-# 
-# # Keep studied traits, rm non possible values, Homo sapiens and duplicate values
-# sp_tr1 <- imp_tr_df %>% 
-#   dplyr::distinct() %>% 
-#   dplyr::filter(scientific_name != "Homo sapiens") %>% 
-#   dplyr::select(c("scientific_name",
-#                   "age_life.span_years",
-#                   "diet_trophic.level_num",
-#                   "reproduction_reproductive.rate_num.offspring.per.year",
-#                   "reproduction_fecundity_num",
-#                   "length_adult_cm",
-#                   "mass_adult_g")) %>% 
-#   dplyr::mutate(age_life.span_years = if_else(age_life.span_years <= 0, 
-#                                               NA, age_life.span_years)) %>% 
-#   dplyr::mutate(reproduction_fecundity_num = if_else(reproduction_fecundity_num < 0, 
-#                                               NA, reproduction_fecundity_num))
-# 
-# # Build one df per Taxa and get traits completedness:
-# 
-# # 
-# 
-# 
-# 
-# # 3 - Create a new reproduction and size column ================================
-# 
-# # For the two reproduction columns - chose the dominant trait:
-# # Fish - fecundity
-# # Mammals - repro rate
-# # Amphibians - repro rate
-# # Birds - repro rate
-# # Zooplankton - fecundity
-# 
-# # Keep only data for the chosen traits for each taxa:
-# sp_tr2 <- sp_tr1 %>% 
-#   dplyr::left_join(taxa_sp_list_final, by = "scientific_name") %>% 
-#   dplyr::mutate("reproduction_reproductive.rate_num.offspring.per.year" = if_else(taxa %in% c("Fish", "Zooplankton"),
-#                                                                                   NA,   
-#                                                                                   reproduction_reproductive.rate_num.offspring.per.year)) %>% 
-#   dplyr::mutate("reproduction_fecundity_num" = if_else(taxa %in% c("Amphibians",
-#                                                                    "Mammals",
-#                                                                    "Birds"),
-#                                                        NA,
-#                                                        reproduction_fecundity_num)) %>% 
-#   dplyr::select(c("scientific_name",
-#                   "taxa",
-#                   "age_life.span_years",
-#                   "diet_trophic.level_num",
-#                   "reproduction_reproductive.rate_num.offspring.per.year",
-#                   "reproduction_fecundity_num",
-#                   "length_adult_cm",
-#                   "mass_adult_g")) %>% 
-#   dplyr::distinct()
-# 
-# # Some species have taxa == NA, insect of species present only in PIE: rm
-# sp_tr3 <- sp_tr2 %>% 
-#   dplyr::filter(! is.na(taxa))
-# 
-# # ADD SIZE COLUMN HERE !!!!!
-# 
-# # Some species are in the list but not in the species traits df
-# setdiff(taxa_sp_list_final$scientific_name,
-#         sp_tr3$scientific_name)
-# # All the genus ones: ok!
-# 
-# # Number of species to work on: (birds, mammals, fish, zooplankton, aphibians)
-# length(unique(sp_tr3$scientific_name))
-# 
-# # Save it
-# saveRDS(sp_tr3, file.path("transformed_data",
-#                           "sp_tr.rds"))
-# 
-# 
-# # 5 - Transform traits =========================================================
-# 
-# 
-# # Z-transform the traits and log when necessary:
-# sp_tr4 <- taxa_sp_list_final %>% 
-#   dplyr::left_join(sp_tr3, by = "scientific_name") %>% 
-#   dplyr::group_by(project) %>% 
-#   dplyr::mutate(tr.age.zp = scale(age_life.span_years)[, 1],
-#                 tr.trophic.level.zp = scale(diet_trophic.level_num)[,1],
-#                 tr.reproductive.rate.zp = scale(reproduction_reproductive.rate_num.offspring.per.year)[,1],
-#                 tr.fecundity.zp = scale(reproduction_fecundity_num)[,1],
-#                 tr.mass.adult.zp = scale(log(mass_adult_g, 10))[,1],
-#                 tr.length.adult.zp = scale(log(length_adult_cm, 10))[,1]) %>% 
-#   dplyr::distinct() %>% 
-#   dplyr::select(c("taxa.x", "scientific_name",
-#                   "tr.age.zp", "tr.trophic.level.zp",
-#                   "tr.reproductive.rate.zp",
-#                   "tr.fecundity.zp",
-#                   "tr.mass.adult.zp",
-#                   "tr.length.adult.zp")) %>% 
-#   dplyr::rename(taxa = "taxa.x")
-#   
-# # Add two reprod col together and save it:
-# sp_tr5 <- sp_tr4 %>%
-#   dplyr::mutate(tr.reproduction.zp = dplyr::coalesce(tr.reproductive.rate.zp, 
-#                                                      tr.fecundity.zp)) %>%
-#   dplyr::select(-c(tr.reproductive.rate.zp, tr.fecundity.zp))
-# 
-# # Do: tr completion
-# # NOTE: I HAVE NAN values: check when they started to show
-# # NOTE: can't synchronise to drive
-# 
-# saveRDS(sp_tr5, file.path("transformed_data",
-#                           "sp_tr_zscore.rds"))
-# 
