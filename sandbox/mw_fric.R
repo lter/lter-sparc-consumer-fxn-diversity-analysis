@@ -8,7 +8,7 @@
 
 ### load necessary libraries ---
 # install.packages("librarian")
-librarian::shelf(tidyverse, mFD)
+librarian::shelf(tidyverse, FD)
 
 ### set simple workflow functions ---
 nacheck <- function(df) {
@@ -73,7 +73,7 @@ dt_og <- dt |>
       filter(!(outlier_hi & elasmo)) |>
       select(-mean_dmperind, -sd_dmperind, -upper_bound, -outlier_hi, -elasmo)
 
-test <- anti_join(dt, dt_og)
+# test <- anti_join(dt, dt_og)
 
 ### check to see NA fixes incorporated
 na_count_per_column <- sapply(dt, function(x) sum(is.na(x)))
@@ -192,19 +192,69 @@ dt2c <- dt2b |>
                   project == 'COASTAL_CEN' ~ subsite_level2,
                   project == 'COASTAL_SOUTH' ~ subsite_level2)
       ) |> 
-      select(project, habitat, site, year, month, system, scientific_name, total_n_area, total_p_area,
-             total_bm_area, density)
+      select(project, habitat, site, year, month, system, scientific_name, 
+             total_n_area, total_p_area, total_bm_area, density) |> 
+      group_by(project, habitat, site, year, month, system) |>
+      summarize(
+            n = sum(total_n_area),
+            p = sum(total_p_area),
+            bm = sum(total_bm_area)
+      ) |>
+      group_by(project, year, habitat, system) |> 
+      summarize(
+            n = mean(n, na.rm = TRUE),
+            p = mean(p, na.rm = TRUE),
+            bm = mean(n, na.rm = TRUE),
+            .groups = 'drop'
+      )
+
+fdiv <- read_rds('transformed_data/fd_ind_time.rds') |> 
+      select(project, habitat, system, year, everything()) |> 
+      rename(
+            species_richness = sp_richn,
+            functional_richness = fric,
+            functional_dispersion = fdis,
+            functional_specialization = fspe
+      )
+glimpse(fdiv)
 glimpse(dt2c)
 
-traits <- read_csv('../Collaborative/FnxSynthBase/consumer-trait-species-imputed-taxonmic-database.csv') |> 
-      select(phylum, order, family, genus, scientific_name,
-             age_life.span_years, diet_trophic.level_num, mass_adult_g,
-             reproduction_reproductive.rate_num.offspring.per.clutch.or.litter) |> 
-      distinct()
+# additional stuff --------------------------------------------------------
+# traits <- read_csv('../Collaborative/FnxSynthBase/consumer-trait-species-imputed-taxonmic-database.csv') |> 
+#       select(phylum, order, family, genus, scientific_name,
+#              age_life.span_years, diet_trophic.level_num, mass_adult_g,
+#              reproduction_reproductive.rate_num.offspring.per.clutch.or.litter) |> 
+#       distinct() |> 
+#       mutate(age_life.span_years = case_when(
+#             age_life.span_years < 0 ~ NA_real_,
+#             TRUE ~ age_life.span_years
+#       ))
+# 
+# fish <- dt2c |> select(scientific_name) |> distinct()
+# traits1 <- fish |> left_join(traits)
+# glimpse(traits1)
+# 
+# all <- dt2c |> left_join(traits1) 
+# glimpse(all)
 
-glimpse(traits)
-test <- traits |> filter(is.na(mass_adult_g))
-
-all <- dt2c |> left_join(traits)
-glimpse(all)
+# all1 <- all |> 
+#       group_by(project, habitat, site, year, month, system) |> 
+#       mutate(across)
+#       summarize(
+#             total_bm = sum(total_bm_area, na.rm = TRUE),
+#             age_wm  = ifelse(total_bm > 0,
+#                              sum(age_life.span_years * total_bm_area, na.rm = TRUE) / total_bm,
+#                              NA_real_),
+#             diet_wm = ifelse(total_bm > 0,
+#                              sum(diet_trophic.level_num * total_bm_area, na.rm = TRUE) / total_bm,
+#                              NA_real_),
+#             mass_wm = ifelse(total_bm > 0,
+#                              sum(mass_adult_g * total_bm_area, na.rm = TRUE) / total_bm,
+#                              NA_real_),
+#             repro_wm = ifelse(total_bm > 0,
+#                               sum(reproduction_reproductive.rate_num.offspring.per.clutch.or.litter * total_bm_area,
+#                                   na.rm = TRUE) / total_bm,
+#                               NA_real_),
+#             .groups = "drop"
+#       )
 # write_csv(all, '../Collaborative/dataforcamille.csv')
