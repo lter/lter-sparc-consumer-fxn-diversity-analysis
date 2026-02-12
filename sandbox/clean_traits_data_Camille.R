@@ -15,7 +15,8 @@
 `%>%` <- magrittr::`%>%`
 
 # Load libraries
-librarian::shelf(tidyverse, dplyr, funbiogeo, ggplot2, janitor)
+librarian::shelf(tidyverse, dplyr, funbiogeo, ggplot2, janitor, ggExtra)
+
 
 
 # Get set up
@@ -329,9 +330,6 @@ trait.checks <- all_traits %>% group_by(project, taxon) %>% summarise(
 
 
 
-library(ggplot2)
-library(ggExtra)
-library(rlang)
 
 plot_with_margins <- function(data, x, y, title) {
   
@@ -396,7 +394,7 @@ for(i in 1:length(unique(all_traits$project))){
     #print(p1)
   }
   if(length(which(!is.na(proj.dat$tr.age.zt)))<3 | length(which(!is.na(proj.dat$tr.mass.adult.zt)))<3 ){
-    p1 <- ggplot() + labs(x="not enough age or mass data", title=my.project) + theme_bw() + labs(title=project)
+    p1 <- ggplot() + labs(x="not enough age or mass data", title=my.project) + theme_bw() + labs(title=my.project)
     #print(p1)
   }
   if(length(which(!is.na(proj.dat$tr.trophic.level.zt)))>2 & length(which(!is.na(proj.dat$tr.reproduction.unified.zt)))>2 ){
