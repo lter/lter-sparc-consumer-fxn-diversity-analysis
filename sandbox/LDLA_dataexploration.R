@@ -772,6 +772,8 @@ ggplot(dups, aes(x=PC2, y=PC2.t, col=project)) + geom_point() + geom_abline(slop
  
 
 
+
+
 #---------- poor attempts at exploring community patterns
 communities <- read.csv(file = "Data/community_tidy-data/04_harmonized_consumer_excretion_sparc_cnd_site.csv") 
 glimpse(communities)
