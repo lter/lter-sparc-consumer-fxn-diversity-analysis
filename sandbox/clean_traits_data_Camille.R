@@ -311,6 +311,8 @@ all_traits <- program_sp_trt_data %>% filter(!project %in% BAD) %>%
 
 # 5 - Trait QA/QC  =========================
 
+#### . check for too many non-unique values ============
+  # would indicate a problem with data processing or insufficiently fine-scale taxonomic imputation
 trait.checks <- all_traits %>% group_by(project, taxon) %>% summarise(
   n.spp = n(),
   n.spp.kingprob = length(which(is.na(kingdom))),
@@ -350,30 +352,63 @@ plot_with_margins <- function(data, x, y, title) {
     color = "black"
   )
 }
-plot_with_margins(all_traits, tr.mass.adult.zt, tr.age.zt, "test")
 
 
+
+#### . Visualize each site with z-score standardized values. ====
+currentversion <- paste("SiteTraitCheck",format(Sys.Date(), "%Y%m%d"), sep=".")
+dir.create(paste("PrelimResults/DataQA-QC/", currentversion, sep=""))
+
+# will save 
 for(i in 1:length(unique(all_traits$project))){
-  project <- unique(all_traits$project)[i]
-  proj.dat <- all_traits %>% filter(project == project)
+  my.project <- unique(all_traits$project)[i]
+  proj.dat <- all_traits %>% filter(project == my.project)
   
-  pls <- list()
   if(length(which(!is.na(proj.dat$tr.age.zt)))>2 & length(which(!is.na(proj.dat$tr.mass.adult.zt)))>2 ){
-    (plot_with_margins(proj.dat, tr.mass.adult.zt, tr.age.zt, project))
-    
+    p1 <- plot_with_margins(proj.dat, tr.mass.adult.zt, tr.age.zt, my.project)
   }
   if(length(which(!is.na(proj.dat$tr.age.zt)))<3 | length(which(!is.na(proj.dat$tr.mass.adult.zt)))<3 ){
-    pls[[i]] <- ggplot() + labs(x="not enough age or mass data") + theme_bw() + labs(title=project)
-    
+    p1 <- ggplot() + labs(x="not enough age or mass data", title=my.project) + theme_bw() 
+    #print(p1)
   }
   if(length(which(!is.na(proj.dat$tr.trophic.level.zt)))>2 & length(which(!is.na(proj.dat$tr.reproduction.unified.zt)))>2 ){
-    pls[i + length(unique(all_traits$project))] <- plot_with_margins(proj.dat, tr.trophic.level.zt, tr.reproduction.unified.zt, i)
-    
+    p2<- plot_with_margins(proj.dat, tr.trophic.level.zt, tr.reproduction.unified.zt, my.project)
+    #print(p2)
   }
   if(length(which(!is.na(proj.dat$tr.trophic.level.zt)))<3 | length(which(!is.na(proj.dat$tr.reproduction.unified.zt)))<3 ){
-    pls[i + length(unique(all_traits$project))] <- ggplot() + labs(x="not enough trophic or reproduction data") + theme_bw())
-    
+    p2 <- ggplot() + labs(x="not enough trophic or reproduction data", title=my.project) + theme_bw()
+    #print(p2)
   }
+  ggsave(plot=p1,filename=paste(my.project,"zMass-zAge.jpg", sep="_"),path = file.path("PrelimResults","DataQA-QC",currentversion,"MassAge_zscore"), create.dir = TRUE)
+  ggsave(plot=p2,filename=paste(my.project,"zTrophic-zRepro.jpg", sep="_"),path = file.path("PrelimResults","DataQA-QC",currentversion,"TrophicRepro_zscore"), create.dir = TRUE)
+  
+}
+
+#### . Visualize each site with raw values ====
+for(i in 1:length(unique(all_traits$project))){
+  my.project <- unique(all_traits$project)[i]
+  proj.dat <- all_traits %>% filter(project == my.project)
+  proj.dat$logmass <- log10(proj.dat$mass_adult_g)
+  proj.dat$logage <- log10(proj.dat$age_life.span_years)
+  proj.dat$logrepro <- log10(proj.dat$reproduction.unified)
+  if(length(which(!is.na(proj.dat$tr.age.zt)))>2 & length(which(!is.na(proj.dat$tr.mass.adult.zt)))>2 ){
+    p1 <- plot_with_margins(proj.dat, x=logmass, y=logage, my.project)
+    #print(p1)
+  }
+  if(length(which(!is.na(proj.dat$tr.age.zt)))<3 | length(which(!is.na(proj.dat$tr.mass.adult.zt)))<3 ){
+    p1 <- ggplot() + labs(x="not enough age or mass data", title=my.project) + theme_bw() + labs(title=project)
+    #print(p1)
+  }
+  if(length(which(!is.na(proj.dat$tr.trophic.level.zt)))>2 & length(which(!is.na(proj.dat$tr.reproduction.unified.zt)))>2 ){
+    p2<- plot_with_margins(proj.dat, diet_trophic.level_num, logrepro, my.project)
+    #print(p2)
+  }
+  if(length(which(!is.na(proj.dat$tr.trophic.level.zt)))<3 | length(which(!is.na(proj.dat$tr.reproduction.unified.zt)))<3 ){
+    p2 <- ggplot() + labs(x="not enough trophic or reproduction data", title=my.project) + theme_bw()
+    #print(p2)
+  }
+  ggsave(plot=p1,filename=paste(my.project,"logMass-logAge.jpg", sep="_"),path = file.path("PrelimResults","DataQA-QC",currentversion,"MassAge_raw"), create.dir = TRUE)
+  ggsave(plot=p2,filename=paste(my.project,"Trophic-logRepro.jpg", sep="_"),path = file.path("PrelimResults","DataQA-QC",currentversion,"TrophicRepro_raw"), create.dir = TRUE)
   
 }
 
@@ -384,6 +419,13 @@ for(i in 1:length(unique(all_traits$project))){
 
 
 
+
+
+
+
+
+
+## 6 - Save cleaned trait data ===================
 saveRDS(all_traits,
         file.path("transformed_data",
                   "sp_tr_zscore.rds"))
