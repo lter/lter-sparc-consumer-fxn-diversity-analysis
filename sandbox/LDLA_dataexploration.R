@@ -212,7 +212,7 @@ all_traits.verts <- all_traits %>% filter(taxa %in% c("Fish","Birds"))
 all_traits.verts$n_nas <- rowSums(is.na(all_traits.verts[,grep(pattern = ".zp", x = colnames(all_traits.verts))]))
 
   
-all_traits.final <- all_traits.verts %>% filter(n_nas < 3)
+all_traits.final <- all_traits.verts %>% filter(n_nas < 4)
 
 
 # 3 - Project-level z-score standardization ===================================================
@@ -387,7 +387,7 @@ p2mass
 
 
 p2rep <- ggplot(taxa.df, aes(x = PC1, y = PC2)) +
-  geom_point(aes(fill = tr.reproductive.rate.zp, shape = taxa), size = 2) +
+  geom_point(aes(fill = tr.reproduction.unified.zp, shape = taxa), size = 2) +
   geom_polygon(data = taxa.df.hulls, aes(lty = taxa), color = "black", fill = NA) +
   scale_fill_viridis() +
   scale_shape_manual(values = 21:23) +
@@ -573,7 +573,7 @@ p2mass.t
 
 
 p2rep.t <- ggplot(taxa.df.t, aes(x = PC1.t, y = PC2.t)) +
-  geom_point(aes(fill = tr.reproductive.rate.zt, shape = taxa), size = 2) +
+  geom_point(aes(fill = tr.reproduction.unified.zt, shape = taxa), size = 2) +
   geom_polygon(data = taxa.df.hulls.t, aes(lty = taxa), color = "black", fill = NA) +
   scale_fill_viridis() +
   scale_shape_manual(values = 21:23) +
