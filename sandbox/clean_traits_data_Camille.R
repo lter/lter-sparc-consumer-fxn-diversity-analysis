@@ -343,7 +343,11 @@ trait.checks <- all_traits %>% group_by(project, taxon) %>% summarise(
   n.unique.age = length(unique(tr.age.zt[which(!is.na(tr.age.zt))])),
   n.repro = length(which(!is.na(tr.reproduction.unified.zt))),
   n.unique.repro = length(unique(tr.reproduction.unified.zt[which(!is.na(tr.reproduction.unified.zt))])),
-  )
+  ) %>%
+  mutate(perc.unique.mass = n.unique.mass/n.mass,
+         perc.unique.trophic = n.unique.trophic/n.trophic,
+         perc.unique.age= n.unique.age/n.age,
+         perc.unique.repro = n.unique.repro/n.repro)
 
 
 
