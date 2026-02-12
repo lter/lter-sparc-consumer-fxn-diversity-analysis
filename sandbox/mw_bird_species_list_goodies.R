@@ -67,11 +67,11 @@ traits <- readxl::read_xlsx('../Collaborative/FnxSynthBase/BirdFuncDatExcel.xlsx
       mutate(
             # MW, NL, and LE made a call on these
             diet_trophic.level_num = case_when(
-                  diet_cat == "PlantSeed"    ~ 1,
-                  diet_cat == "FruiNect"     ~ 1,
-                  diet_cat == "Omnivore"     ~ 1.5,
-                  diet_cat == "Invertebrate" ~ 2,
-                  diet_cat == "VertFishScav" ~ 3,
+                  diet_cat == "PlantSeed"    ~ 2,
+                  diet_cat == "FruiNect"     ~ 3,
+                  diet_cat == "Omnivore"     ~ 2.5,
+                  diet_cat == "Invertebrate" ~ 3,
+                  diet_cat == "VertFishScav" ~ 4,
                   TRUE ~ NA_real_
             ),
             # MW, NL, and LE made a call on these

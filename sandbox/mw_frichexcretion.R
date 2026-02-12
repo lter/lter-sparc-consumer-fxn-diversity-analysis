@@ -122,7 +122,7 @@ glimpse(dt1)
 dt2 <- dt1 |>
       filter(project != 'MCR') |> 
       group_by(project, habitat, year, month,
-               site, subsite_level1, subsite_level2, subsite_level3, scientific_name) |> 
+               site, subsite_level1, subsite_level2, subsite_level3) |> 
       summarize(
             ### calculate total nitrogen supply at each sampling unit and then sum to get column with all totals
             total_nitrogen_m = sum(nind_ug_hr * density, na_rm = TRUE),
@@ -146,13 +146,13 @@ dt2 <- dt1 |>
       ungroup() |> 
       arrange(project, year) |> 
       dplyr::select(project, habitat, site, subsite_level1, subsite_level2, subsite_level3,
-                    year, month, total_n_area, total_p_area, total_bm_area, density, scientific_name)
+                    year, month, total_n_area, total_p_area, total_bm_area, density)
 glimpse(dt2)
 
 dt2a <- dt1 |>
       filter(project == 'MCR') |> 
       group_by(project, habitat, year, month,
-               site, subsite_level1, subsite_level2, scientific_name) |> 
+               site, subsite_level1, subsite_level2) |> 
       summarize(
             ### calculate total nitrogen supply at each sampling unit and then sum to get column with all totals
             total_nitrogen_m = sum(nind_ug_hr * density, na_rm = TRUE),
@@ -177,7 +177,7 @@ dt2a <- dt1 |>
       ungroup() |> 
       arrange(project, year) |> 
       dplyr::select(project, habitat, site, subsite_level1, subsite_level2, subsite_level3,
-                    year, month, total_n_area, total_p_area, total_bm_area, density, scientific_name)
+                    year, month, total_n_area, total_p_area, total_bm_area, density)
 glimpse(dt2a)
 dt2b <- rbind(dt2, dt2a)
 
@@ -192,41 +192,41 @@ dt2c <- dt2b |>
                   project == 'COASTAL_SOUTH' ~ subsite_level2,
                   project == 'VCR' ~ paste(site, subsite_level1, sep = ''))) |> 
       select(project, habitat, site, year, month, system, 
-             total_n_area, total_p_area, total_bm_area, density, scientific_name) |> 
-      group_by(project, habitat, site, year, month, system, scientific_name) |>
+             total_n_area, total_p_area, total_bm_area, density) |> 
+      group_by(project, habitat, site, year, month, system) |>
       summarize(
             n = mean(total_n_area),
             p = mean(total_p_area),
             bm = mean(total_bm_area)
       ) |> 
-      group_by(project, habitat, year, system, scientific_name) |>
+      group_by(project, habitat, year, system) |>
       summarize(
             n = mean(n),
             p = mean(p),
             bm = mean(bm),
             .groups = 'drop'
       ) 
-fish <- dt2c
-# fdiv <- read_rds('transformed_data/fd_ind_time.rds') |> 
-#       select(project, habitat, system, year, scientific_name, everything()) |> 
-#       rename(
-#             species_richness = sp_richn,
-#             functional_richness = fric,
-#             functional_dispersion = fdis,
-#             functional_specialization = fspe,
-#             functional_nearest_neighbor_distance = fnnd
-#       )
-# glimpse(fdiv)
-# glimpse(dt2c)
-# 
-# test <- anti_join(dt2c, fdiv)
-# 
-# all <- dt2c |> left_join(fdiv) |> 
-#       ### 18 observations didn't pull over, but can figure out later + now, a bunch of VCR sites...
-#       filter(!is.na(functional_richness))
-# glimpse(all)
-# fish <-all
-# all1 <- fish
+
+fdiv <- read_rds('transformed_data/fd_ind_time.rds') |> 
+      select(project, habitat, system, year, everything()) |> 
+      rename(
+            species_richness = sp_richn,
+            functional_richness = fric,
+            functional_dispersion = fdis,
+            functional_specialization = fspe,
+            functional_nearest_neighbor_distance = fnnd
+      )
+glimpse(fdiv)
+glimpse(dt2c)
+
+test <- anti_join(dt2c, fdiv)
+
+all <- dt2c |> left_join(fdiv) |> 
+      ### 18 observations didn't pull over, but can figure out later + now, a bunch of VCR sites...
+      filter(!is.na(functional_richness))
+glimpse(all)
+fish <-all
+all1 <- fish
 rm(list = setdiff(ls(), c("fish", "nacheck")))
 
 dt <- read_csv('../Collaborative/FnxSynthBase/04_harmonized_consumer_excretion_sparc_cnd_site02122026.csv') |> 
@@ -306,10 +306,10 @@ nacheck(dt1)
 
 dt2 <- dt1 |>
       group_by(project, habitat, year, month,
-               site, subsite_level1, subsite_level2, subsite_level3, scientific_name) |> 
+               site, subsite_level1, subsite_level2, subsite_level3) |> 
       mutate(
             density = coalesce(density_num_m, density_num_m2, density_num_m3),
-            ) |> 
+      ) |> 
       summarize(
             total_n_area = sum(nind_ug_hr * density, na_rm = TRUE),
             total_p_area = sum(pind_ug_hr * density, na_rm = TRUE),
@@ -318,11 +318,10 @@ dt2 <- dt1 |>
       ungroup() |> 
       arrange(project, year) |> 
       dplyr::select(project, habitat, site, subsite_level1, subsite_level2, subsite_level3,
-                    year, month, total_n_area, total_p_area, total_bm_area, density, scientific_name)
+                    year, month, total_n_area, total_p_area, total_bm_area, density)
 glimpse(dt2)
 
-systems <- dt2 |> select(project, habitat, site, subsite_level1, subsite_level2, subsite_level3,
-                         scientific_name) |> distinct()
+systems <- dt2 |> select(project, habitat, site, subsite_level1, subsite_level2, subsite_level3) |> distinct()
 
 zoop <- dt2 |> 
       arrange(project, year) |>
@@ -335,14 +334,14 @@ zoop <- dt2 |>
                   project == 'Palmer' ~ site)
       ) |> 
       select(project, habitat, site, year, month, system, 
-             total_n_area, total_p_area, total_bm_area, density, scientific_name) |> 
-      group_by(project, habitat, site, year, month, system, scientific_name) |>
+             total_n_area, total_p_area, total_bm_area, density) |> 
+      group_by(project, habitat, site, year, month, system) |>
       summarize(
             n = mean(total_n_area),
             p = mean(total_p_area),
             bm = mean(total_bm_area)
       ) |> 
-      group_by(project, habitat, year, system, scientific_name) |>
+      group_by(project, habitat, year, system) |>
       summarize(
             n = mean(n),
             p = mean(p),
@@ -351,108 +350,10 @@ zoop <- dt2 |>
       ) 
 glimpse(zoop)
 glimpse(fish)
-zoop_fish <- rbind(fish, zoop)
+fish_short <- fish |> select(project, habitat, year, system, n, p, bm) |> ungroup()
+rm(list = setdiff(ls(), c("fish", "zoop", "nacheck", "fish_short")))
+zoop_fish <- rbind(fish_short, zoop)
 glimpse(zoop_fish)
 
-traits <- read_rds('transformed_data/sp_tr_zscore.rds') |> ungroup() |> 
-      select(
-            scientific_name, 
-            tr.age.zt,
-            tr.trophic.level.zt,
-            tr.fecundity.zt,
-            tr.reproduction.unified.zt,
-            tr.mass.adult.zt
-            ) |> 
-      distinct()
-glimpse(traits)
-
-zoop_fish_traits <- zoop_fish |> left_join(traits) |> distinct()
-nacheck(zoop_fish_traits)
-
-rm(list = setdiff(ls(), c("fish", "zoop", "nacheck", "fish_short", "zoop_fish", "zoop_fish_traits")))
-glimpse(zoop_fish_traits)
-tr_cols <- names(zoop_fish_traits) |> grep("^tr\\.", x = _, value = TRUE)
-
-cwm <- zoop_fish_traits |>
-      group_by(project, system, year) |>
-      summarize(
-            across(
-                  all_of(tr_cols),
-                  ~ weighted.mean(.x, w = bm, na.rm = TRUE),
-                  .names = "cwm_{.col}"
-            ),
-            bm_tot = sum(bm, na.rm = TRUE),
-            n_taxa = n_distinct(scientific_name[bm!=0]),
-            .groups = "drop"
-      ) |> 
-      mutate(
-            across(
-                  starts_with("cwm_tr."),
-                  ~ ifelse(is.nan(.x), 
-                           NA_real_, 
-                           .x)
-            )
-      ) |> 
-      filter(!project %in% c('Arctic', 'Palmer', 'NorthLakes'))
-glimpse(cwm)
-
-trait_metrics <- names(cwm) |> grep("^cwm_tr\\.", x = _, value = TRUE)
-trait_metrics
-
-cwm |>
-      pivot_longer(cols = all_of(trait_metrics), names_to = "metric", values_to = "value") |>
-      ggplot(aes(x = value)) +
-      geom_histogram(bins = 30, color = "black", fill = "grey80") +
-      facet_wrap(~metric, scales = "free", ncol = 2) +
-      theme_classic() +
-      labs(x = NULL, y = "Count")
-
-cwm_ts_long <- cwm |>
-      # optional: convert NaN to NA across numeric cols if needed
-      mutate(across(where(is.numeric), ~ replace(.x, is.nan(.x), NA_real_))) |>
-      # z-score each metric across all rows (or you can do within project/system—see note below)
-      mutate(across(all_of(trait_metrics), ~ scale(.x)[, 1], .names = "{.col}_z")) |>
-      pivot_longer(
-            cols = ends_with("_z"),
-            names_to = "metric",
-            values_to = "value"
-      ) |>
-      mutate(
-            variable = str_remove(metric, "_z$"),
-            year_scaled = (year - min(year, na.rm = TRUE)) / (max(year, na.rm = TRUE) - min(year, na.rm = TRUE))
-      ) |>
-      group_by(project, system, variable) |>
-      filter(n_distinct(year) >= 4) |>
-      ungroup() |>
-      select(project, system, year, metric, value, variable, year_scaled)
-
-glimpse(cwm_ts_long)
-
-trend_results_cwm <- cwm_ts_long |>
-      group_by(project, system, variable) |>
-      nest() |>
-      mutate(
-            n_years = map_int(data, ~ n_distinct(.x$year)),
-            model = map(data, ~ if (all(is.na(.x$value))) NULL else lm(value ~ year_scaled, data = .x)),
-            model_type = "lm",
-            slope = map_dbl(model, ~ if (is.null(.x)) NA_real_ else unname(coef(.x)["year_scaled"])),
-            std_error = map_dbl(model, ~ if (is.null(.x)) NA_real_ else summary(.x)$coefficients["year_scaled","Std. Error"]),
-            p_value   = map_dbl(model, ~ if (is.null(.x)) NA_real_ else summary(.x)$coefficients["year_scaled","Pr(>|t|)"]),
-            conf_low  = slope - 1.96 * std_error,
-            conf_high = slope + 1.96 * std_error,
-            significant = case_when(
-                  is.na(p_value) ~ NA_character_,
-                  p_value < 0.05 & slope > 0 ~ "Increase",
-                  p_value < 0.05 & slope < 0 ~ "Decline",
-                  p_value < 0.1 ~ "Marginal",
-                  TRUE ~ "Not significant"
-            )
-      ) |>
-      select(project, system, variable, n_years, slope, std_error, p_value,
-             conf_low, conf_high, model_type, significant) |> 
-      filter(!is.na(slope)) |> 
-      ungroup()
-
-glimpse(trend_results_cwm)
-nacheck(trend_results_cwm)
-
+traits <- read_rds('transformed_data/sp_tr_zscore.rds')
+zoop_fish_traits <- zoop_fish |> left_join(traits)
