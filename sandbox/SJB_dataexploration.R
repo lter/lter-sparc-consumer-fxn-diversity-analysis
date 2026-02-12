@@ -1,74 +1,51 @@
 ###
 
 ### IMPORTANT: requires running the script LDLA_dataexploration.R
+### LOAD RDS FILES FOR TRAITS/COORDINATES AND COMMUNITIES
 
+traits.cleaned <- as.data.frame(readRDS("transformed_data/sp_faxes_coord.rds")) %>%
+  mutate(scientific_name = rownames(.))
 
-communities <- read.csv(file = "Data/community_tidy-data/04_harmonized_consumer_excretion_sparc_cnd_site.csv") 
+community.data <- as.data.frame(readRDS("transformed_data/Macks_data.rds"))
+table(community.data$project)
+table(community.data$habitat)
+table(community.data$system)
 
-comm.filtered.pa <- communities %>%
-  select(project, year, month, habitat, temp_c, site, subsite_level1, subsite_level2, subsite_level3,
-         scientific_name, diet_cat, nind_ug.hr, pind_ug.hr, count_num, density_num.m, density_num.m2,
-         density_num.m3,biomass_g, dmperind_g.ind, kingdom, phylum, class, order, family, genus) %>%
-  mutate(taxa = case_when(
-    project == "CoastalCA" ~ "Fish",
-    project == "FCE" ~ "Fish",
-    project == "SBC" ~ "Fish",
-    project == "MCR" ~ "Fish",
-    project == "VCR" ~ "Fish",
-    project == "RLS" ~ "Fish",
-    project == "FISHGLOB" ~ "Fish",
-    project == "KBS_MAM" ~ "Mammals",
-    project == "SEV" ~ "Mammals",
-    project == "MOHONK" ~ "Amphibians",
-    project == "KBS_AMP" ~ "Amphibians",
-    project %in% c("HARVARD", "KBS_BIR","SBC_BEACH") ~ "Birds",
-    project %in% c("NGA","Arctic","Palmer","CCE","NorthLakes") ~ "Zooplankton",
-    TRUE ~ NA
-  )) %>%
-  filter(habitat != "beach") %>%
-  filter(taxa == "Fish") %>%
-  mutate(scientific_name = str_remove(scientific_name, " spp.")) %>%
-  mutate(project = case_when(project == 'CoastalCA' & site == 'CENTRAL' ~ 'COASTAL_CEN',
-                             project == 'CoastalCA' & site == 'SOUTH' ~ 'COASTAL_SOUTH',
-                             TRUE ~ project)) %>%
-  mutate(density_num.m = case_when(is.na(density_num.m) ~ 0,
-                                   TRUE ~ density_num.m),
-         density_num.m2 = case_when(is.na(density_num.m2) ~ 0,
-                                    TRUE ~ density_num.m2)) %>%
-  mutate(density_coll = density_num.m+density_num.m2) %>%
-  mutate(pres.abs = case_when(density_coll > 0 ~ 1,
-                              TRUE ~ 0)) %>%
-  unite("ID", c(project, habitat, site, subsite_level1, subsite_level2, subsite_level3,
-                year, month), sep = "_", remove = F) %>%
-  filter(pres.abs > 0)
+comm.meta <- community.data %>%
+  dplyr::select(project, habitat, system)
 
+comm.filtered <- community.data %>%
+  filter(density > 0)
 
-traits.df.parsed <- taxa.df.t %>%
+traitsxcomms <- comm.filtered %>%
   ungroup() %>%
-  select(scientific_name, PC1, PC2)
+  inner_join(traits.cleaned, by = "scientific_name") %>%
+  distinct()
 
-traitsxcomms <- comm.filtered.pa %>%
-  ungroup() %>%
-  inner_join(traits.df.parsed, by = "scientific_name") %>%
+traitsanti <- comm.filtered %>%
+  anti_join(traits.cleaned, by = "scientific_name") %>%
+  dplyr::select(scientific_name) %>%
   distinct()
 
 summary(traitsxcomms)
 
+### --- calculate centroids
 centroids <- traitsxcomms %>%
-  filter(pres.abs == 1) %>%
-  unite("site_fine", c(project, site, subsite_level1), remove = F, sep = "_") %>%
-  group_by(project, site, site_fine, year) %>%              # ID uniquely identifies site-year
+  group_by(project, habitat, system, year) %>%              # ID uniquely identifies site-year
   summarise(
     centroid_PC1 = mean(PC1, na.rm = TRUE),
     centroid_PC2 = mean(PC2, na.rm = TRUE),
     n_species = n(),                        # nice to keep track
     .groups = "drop"
-  )
+  ) %>%
+  mutate(t01_proj = (year - min(year, na.rm = TRUE)) / (max(year, na.rm = TRUE) - min(year, na.rm = TRUE)))
+
+
 
 ### calculate trajectores and step lengths using Pythagorean theorem
 centroids.traj <- centroids %>%
-  arrange(project, site, site_fine, year) %>%
-  group_by(project, site, site_fine) %>%
+  arrange(habitat, project, system, year) %>%
+  group_by(habitat, project, system) %>%
   mutate(
     lag_PC1 = lag(centroid_PC1),
     lag_PC2 = lag(centroid_PC2),
@@ -77,34 +54,36 @@ centroids.traj <- centroids %>%
     step_length = sqrt(dPC1^2 + dPC2^2)      # movement through space
   ) %>%
   mutate(angle = atan2(dPC2, dPC1)) %>%
-  ungroup()
+  ungroup() %>%
+  mutate(t01_proj = (year - min(year, na.rm = TRUE)) / (max(year, na.rm = TRUE) - min(year, na.rm = TRUE)))
+
 
 
 ### plot steps
-centroid.plot <- ggplot(centroids, aes(centroid_PC1, centroid_PC2, group = site_fine, color = project)) +
+centroid.plot <- ggplot(centroids, aes(centroid_PC1, centroid_PC2, group = system, color = project)) +
   geom_path(alpha = 0.95) +
-  geom_point(aes(fill = year), size = 2, shape = 21, color = "black") +
+  geom_point(aes(fill = t01_proj), size = 2, shape = 21, color = "black") +
   coord_equal() +
   scale_color_viridis_d() +
   theme_bw(base_size = 14) +
-  facet_wrap(.~fct_reorder(site, project), ncol = 9) +
+  facet_wrap(.~project, ncol = 9) +
   labs(
     x = "PC1",
     y = "PC2",
-    color = "Site",
+    color = "System",
     fill = "Year",
     title = "Community centroid shifts through functional space"
   )
 centroid.plot
 
 
-angle.plot <- ggplot(centroids.traj, aes(year, angle, group = site_fine, color = project)) +
+angle.plot <- ggplot(centroids.traj, aes(year, angle, group = system, color = project)) +
   geom_line() +
   scale_y_continuous(
     breaks = c(-pi, -pi/2, 0, pi/2, pi),
     labels = c("−π", "−π/2", "0", "π/2", "π")
   ) +
-  facet_wrap(.~site) +
+  facet_wrap(.~project) +
   theme_bw(base_size = 14) +
   scale_color_viridis_d() +
   labs(
@@ -115,25 +94,131 @@ angle.plot <- ggplot(centroids.traj, aes(year, angle, group = site_fine, color =
 
 angle.plot
 
+centroids.traj.circ <- centroids.traj %>%
+  mutate(angle.circ = circular(angle))
+
+
+projects <- sort(unique(centroids.traj.circ$project))
+
+
+pairs <- combn(projects, 2, simplify = FALSE)
+
+pairwise_results <- purrr::map_dfr(pairs, function(p) {
+  a1 <- centroids.traj.circ %>% filter(project == p[1]) %>% pull(angle.circ)
+  a2 <- centroids.traj.circ %>% filter(project == p[2]) %>% pull(angle.circ)
+  
+  tst <- watson.two.test(a1, a2)
+  
+  tibble(
+    project1 = p[1],
+    project2 = p[2],
+    statistic = unname(tst$statistic),
+    p_value = unname(tst$alpha)
+  )
+})
+
+pairwise_results %>% arrange(p_value)
+pairwise_results %>%
+  mutate(p_adj = p.adjust(p_value, method = "BH")) %>%
+  arrange(p_adj)
+
+
+centroids.traj.dir <- centroids.traj %>%
+  filter(!is.na(dPC1), !is.na(dPC2)) %>%
+  mutate(axis_ratio = abs(dPC1) / (abs(dPC1) + abs(dPC2)))
+
+hist(centroids.traj.dir$axis_ratio)
+
+m1 <- brm(axis_ratio ~ project + (1|system), data = centroids.traj.dir, family = "beta", cores = 4, chains = 4, backend = "cmdstanr")
+summary(m1)
+
+## --- projects
+
+nd <- expand_grid(centroids.traj.dir, project = sort(unique(centroids.traj.dir$project))) %>%
+  filter(project != "VCR")
+
+ep <- fitted(
+  m1,
+  newdata = nd,
+  re_formula = NA,     # population-level only
+  summary = TRUE
+) %>%
+  as_tibble() %>%
+  bind_cols(nd) %>%
+  rename(mean = Estimate, lwr = Q2.5, upr = Q97.5)
+
+ep
+
+project.direction.plot <- ggplot(ep, aes(x = reorder(project, mean), y = mean)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = lwr, ymax = upr), width = 0.15) +
+  coord_flip() +
+  theme_minimal(base_size = 14) +
+  labs(
+    x = NULL,
+    y = "Expected axis dominance (|dPC1| / (|dPC1| + |dPC2|))",
+    title = "Projects differ in which trait axis dominates centroid movement"
+  )
+project.direction.plot
+
+# ### --- time 
+# nd_time <- expand_grid(
+#   project = unique(centroids.traj.dir$project),
+#   t01_proj = seq(0, 1, length.out = 100)) %>%
+#   filter(project != "VCR")
+# 
+# pred_time <- fitted(
+#   m1,
+#   newdata = nd_time,
+#   re_formula = NA,
+#   summary = TRUE) %>%
+#   as_tibble() %>%
+#   bind_cols(nd_time)
+# 
+# ggplot(pred_time,
+#        aes(x = t01_proj, y = Estimate, colour = project)) +
+#   geom_line() +
+#   scale_fill_viridis_d() +
+#   scale_color_viridis_d() +
+#   geom_ribbon(aes(ymin = Q2.5, ymax = Q97.5, fill = project),
+#               alpha = 0.15, colour = NA) +
+#   theme_minimal(base_size = 14) +
+#   labs(x = "Relative time (0–1)",
+#        y = "Predicted axis_ratio",
+#        title = "Axis dominance through time by project")
+# 
+
+centroids.dir.abs <- centroids.traj.dir %>%
+  mutate(adPC1 = abs(dPC1), adPC2 = abs(dPC2)) 
+
+angle.data <- centroids.traj.circ %>%
+  filter(!is.na(angle)) %>%
+  mutate(angle_wrapped = angle)  # already in [-pi, pi] from atan2
+
+rosette.plots.project <- ggplot(angle.data, aes(angle_wrapped, fill = project)) +
+  geom_histogram(binwidth = pi/12, boundary = 0) +
+  coord_polar(start = pi/2, direction = 1) +   # rotate 90° counterclockwise
+  facet_wrap(~ project, scales = "free") +
+  scale_fill_viridis_d() +
+  theme_bw(base_size = 13) +
+  labs(
+    x = NULL, y = "Count",
+    title = "Centroid movement directions"
+  )
+rosette.plots.project
+
 centroid.tests <- centroids.traj %>%
   filter(!is.na(angle)) %>%
-  group_by(site_fine) %>%
+  group_by(system) %>%
   summarise(
     p = circular::rayleigh.test(circular(angle))$p.value,
     mean_dir = as.numeric(mean(circular(angle))),
     .groups = "drop"
   ) %>%
-  arrange(p)
+  arrange(p) %>%
+  left_join(comm.meta)
 centroid.tests
 
-rosette.plot <- ggplot(centroids.traj, aes(angle, fill = project)) +
-  geom_histogram(binwidth = pi/6) +
-  coord_polar() +
-  facet_wrap(~ site, scales = "free_y", ncol = 9) +
-  theme_bw() +
-  scale_fill_viridis_d()
-  
-rosette.plot
 
 centroid.traj.dir <- centroids.traj %>%
   filter(!is.na(dPC1)) %>%
@@ -143,7 +228,7 @@ centroid.traj.dir <- centroids.traj %>%
 
 centroid.traj.plot <- ggplot(centroid.traj.dir, aes(axis, abs(delta), fill = project)) +
   geom_boxplot() +
-  facet_wrap(~ site, scales = "free_y") +
+  facet_wrap(~ project, scales = "free_y") +
   theme_bw(base_size = 14) +
   labs(
     y = "Magnitude of movement",
@@ -151,46 +236,13 @@ centroid.traj.plot <- ggplot(centroid.traj.dir, aes(axis, abs(delta), fill = pro
   )
 centroid.traj.plot
 
-axis_contrib <- centroids.traj %>%
-  filter(!is.na(dPC1)) %>%
-  group_by(project, site) %>%
-  summarise(
-    var_PC1 = var(dPC1, na.rm = TRUE),
-    var_PC2 = var(dPC2, na.rm = TRUE),
-    ratio = var_PC1 / (var_PC1 + var_PC2),
-    .groups = "drop"
-  )
-axis_contrib
-
-
-axis.cont.plot <- ggplot(axis_contrib, aes(x = fct_reorder(site, ratio), y = ratio, fill = project)) +
-  geom_point(shape = 21, size = 5) +
-  geom_segment(aes(x = fct_reorder(site, ratio), y = ratio, yend = 0, color = project)) +
-  scale_fill_viridis_d() +
-  scale_color_viridis_d() +
-  geom_hline(yintercept = 0.5, lty = 2) +
-  theme_bw(base_size = 14)
-axis.cont.plot
-
-
-step_lengths <- ggplot(centroids.traj, aes(site_fine, step_length, fill = project)) +
-  geom_boxplot(alpha = 0.7, outlier.alpha = 0.4, outliers = FALSE) +
-  theme_bw(base_size = 14) +
-  labs(
-    x = "Site",
-    y = "Step length"
-  ) +
-  theme(legend.position = "top",
-        axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
-  scale_fill_viridis_d()
-step_lengths
 
 step_lengths_time <- centroids.traj %>%
   filter(!is.na(step_length)) %>%
   ggplot(aes(year, step_length, colour = project)) +
   geom_point(alpha = 0.5) +
   geom_smooth(se = FALSE, method = "loess", span = 0.5) +
-  facet_wrap(.~site, scales = "free_y") +
+  facet_wrap(.~project, scales = "free_y") +
   theme_bw(base_size = 14) +
   scale_color_viridis_d() +
   labs(
@@ -200,69 +252,17 @@ step_lengths_time <- centroids.traj %>%
 step_lengths_time
 
 
-### Abundance and biomass
-comm.filtered.abu <- communities %>%
-  select(project, year, month, habitat, temp_c, site, subsite_level1, subsite_level2, subsite_level3,
-         scientific_name, diet_cat, nind_ug.hr, pind_ug.hr, count_num, density_num.m, density_num.m2,
-         density_num.m3,biomass_g, dmperind_g.ind, kingdom, phylum, class, order, family, genus) %>%
-  mutate(taxa = case_when(
-    project == "CoastalCA" ~ "Fish",
-    project == "FCE" ~ "Fish",
-    project == "SBC" ~ "Fish",
-    project == "MCR" ~ "Fish",
-    project == "VCR" ~ "Fish",
-    project == "RLS" ~ "Fish",
-    project == "FISHGLOB" ~ "Fish",
-    project == "KBS_MAM" ~ "Mammals",
-    project == "SEV" ~ "Mammals",
-    project == "MOHONK" ~ "Amphibians",
-    project == "KBS_AMP" ~ "Amphibians",
-    project %in% c("HARVARD", "KBS_BIR","SBC_BEACH") ~ "Birds",
-    project %in% c("NGA","Arctic","Palmer","CCE","NorthLakes") ~ "Zooplankton",
-    TRUE ~ NA
-  )) %>%
-  filter(habitat != "beach") %>%
-  filter(taxa == "Fish") %>%
-  mutate(scientific_name = str_remove(scientific_name, " spp.")) %>%
-  mutate(project = case_when(project == 'CoastalCA' & site == 'CENTRAL' ~ 'COASTAL_CEN',
-                             project == 'CoastalCA' & site == 'SOUTH' ~ 'COASTAL_SOUTH',
-                             TRUE ~ project)) %>%
-  mutate(density_num.m = case_when(is.na(density_num.m) ~ 0,
-                                   TRUE ~ density_num.m),
-         density_num.m2 = case_when(is.na(density_num.m2) ~ 0,
-                                   TRUE ~ density_num.m2)) %>%
-  mutate(density_coll = density_num.m+density_num.m2) %>%
-  filter(density_coll > 0) %>%
-  mutate(biomass_coll = dmperind_g.ind*density_coll) %>%
-  unite("ID", c(project, habitat, site, subsite_level1, subsite_level2, subsite_level3,
-                year, month), sep = "_", remove = F) %>%
-  group_by(ID, project, site, subsite_level1, subsite_level2, subsite_level3, year, scientific_name) %>%
-  summarize(density = sum(density_coll, na.rm = TRUE),
-            biomass = sum(biomass_coll)) %>%
-  filter(!is.na(density), !is.na(biomass)) %>%
-  ungroup()
+### --- Abundance and biomass
 
-
-traits.df.parsed <- taxa.df.t %>%
-  ungroup() %>%
-  select(scientific_name, PC1, PC2)
-
-traitsxcomms <- comm.filtered.abu %>%
-  ungroup() %>%
-  inner_join(traits.df.parsed, by = "scientific_name") %>%
-  distinct()
-
-# safety: restrict to rows with traits & biomass/density
-traits_metrics <- traitsxcomms %>%
-  filter(!is.na(PC1), !is.na(PC2))
 
 # define global grid breaks
 nbins <- 40  # adjust: 20–40 is usually fine
 
-pc1_breaks <- seq(min(traits_metrics$PC1), max(traits_metrics$PC1), length.out = nbins + 1)
-pc2_breaks <- seq(min(traits_metrics$PC2), max(traits_metrics$PC2), length.out = nbins + 1)
+pc1_breaks <- seq(min(traitsxcomms$PC1), max(traitsxcomms$PC1), length.out = nbins + 1)
+pc2_breaks <- seq(min(traitsxcomms$PC2), max(traitsxcomms$PC2), length.out = nbins + 1)
 
-grid.comms <- traits_metrics %>%
+grid.comms <- traitsxcomms %>%
+  rename(biomass = "total_bm_area") %>%
   # reshape metrics
   pivot_longer(
     cols = c(density, biomass),
@@ -274,41 +274,112 @@ grid.comms <- traits_metrics %>%
     pc1_bin = cut(PC1, breaks = pc1_breaks, include.lowest = TRUE),
     pc2_bin = cut(PC2, breaks = pc2_breaks, include.lowest = TRUE)
   ) %>%
-  group_by(project, site, year, metric, pc1_bin, pc2_bin) %>%
+  group_by(project, system, year, metric, pc1_bin, pc2_bin) %>%
   summarise(
     cell_value = sum(value, na.rm = TRUE),
     # use bin centers as coordinates
     PC1_center = mean(PC1, na.rm = TRUE),
     PC2_center = mean(PC2, na.rm = TRUE),
     .groups = "drop"
+  ) 
+
+### --- one more test
+
+p <- 2
+
+hot_traj_all <- grid.comms %>%
+  filter(metric == "biomass",
+         !is.na(cell_value),
+         cell_value > 0,
+         !is.na(PC1_center),
+         !is.na(PC2_center)) %>%
+  group_by(project, year, PC1_center, PC2_center) %>%
+  summarise(v = sum(cell_value), .groups = "drop") %>%
+  group_by(project, year) %>%
+  mutate(w = v^p) %>%
+  summarise(
+    hot_PC1 = weighted.mean(PC1_center, w),
+    hot_PC2 = weighted.mean(PC2_center, w),
+    .groups = "drop"
   )
 
+hotspots.plot.biomass <- ggplot(hot_traj_all, aes(hot_PC1, hot_PC2)) +
+  geom_path(linewidth = 0.2) +
+  geom_label(aes(fill = year, label = year)) +
+  facet_wrap(~ project) +
+  scale_fill_viridis_c(option = "plasma") +
+  coord_equal() +
+  theme_bw(base_size = 13) +
+  theme(panel.grid = element_blank()) +
+  labs(
+    x = "PC1",
+    y = "PC2",
+    colour = "Year",
+    title = paste0("Biomass hotspot trajectories across projects (p = ", p, ")")
+  )
+hotspots.plot.biomass
+
+
+hot_traj_all <- grid.comms %>%
+  filter(metric == "density",
+         !is.na(cell_value),
+         cell_value > 0,
+         !is.na(PC1_center),
+         !is.na(PC2_center)) %>%
+  group_by(project, year, PC1_center, PC2_center) %>%
+  summarise(v = sum(cell_value), .groups = "drop") %>%
+  group_by(project, year) %>%
+  mutate(w = v^p) %>%
+  summarise(
+    hot_PC1 = weighted.mean(PC1_center, w),
+    hot_PC2 = weighted.mean(PC2_center, w),
+    .groups = "drop"
+  )
+
+hotspots.plot.density <- ggplot(hot_traj_all, aes(hot_PC1, hot_PC2)) +
+  geom_path(linewidth = 0.2) +
+  geom_label(aes(fill = year, label = year)) +
+  facet_wrap(~ project) +
+  scale_fill_viridis_c(option = "plasma") +
+  coord_equal() +
+  theme_bw(base_size = 13) +
+  theme(panel.grid = element_blank()) +
+  labs(
+    x = "PC1",
+    y = "PC2",
+    colour = "Year",
+    title = paste0("Density hotspot trajectories across projects (p = ", p, ")")
+  )
+hotspots.plot.density
+
+### --- 
 
 hotspot.cells <- grid.comms %>%
-  group_by(project, site, year, metric) %>%
+  group_by(project, system, year, metric) %>%
   arrange(desc(cell_value), .by_group = TRUE) %>%
   mutate(
     total_value = sum(cell_value, na.rm = TRUE),
     cum_prop = cumsum(cell_value) / total_value,
-    hotspot = cum_prop <= 0.8   # top 50% of biomass/density
+    hotspot = cum_prop <= 0.4   # top 50% of biomass/density
   ) %>%
   ungroup() %>%
   filter(hotspot)
 
 
 hotspot.centroids <- hotspot.cells %>%
-  group_by(project, site, year, metric) %>%
+  group_by(project, system, year, metric) %>%
   summarise(
     hotspot_PC1 = sum(PC1_center * cell_value) / sum(cell_value),
     hotspot_PC2 = sum(PC2_center * cell_value) / sum(cell_value),
     n_cells     = n(),
     .groups = "drop"
-  )
+  ) %>%
+  mutate(t01_proj = (year - min(year, na.rm = TRUE)) / (max(year, na.rm = TRUE) - min(year, na.rm = TRUE)))
 
 
 hotspot.centroids.traj <- hotspot.centroids %>%
-  arrange(project, site, metric, year) %>%
-  group_by(project, site, metric) %>%
+  arrange(project, system, metric, year) %>%
+  group_by(project, system, metric) %>%
   mutate(
     lag_PC1 = lag(hotspot_PC1),
     lag_PC2 = lag(hotspot_PC2),
@@ -321,14 +392,14 @@ hotspot.centroids.traj <- hotspot.centroids %>%
 
 hotspot.centroid.plot <- ggplot(hotspot.centroids,
                                   aes(hotspot_PC1, hotspot_PC2,
-                                      group = interaction(site, metric),
+                                      group = interaction(system, metric),
                                       colour = metric)
 ) +
   geom_path(arrow = arrow(type = "closed", length = unit(0.08, "inches")),
             alpha = 0.9) +
   geom_point(aes(size = year), alpha = 0.8) +
   scale_color_viridis_d() +
-  facet_wrap(~ site, ncol = 9) +
+  facet_wrap(~ project, ncol = 3) +
   coord_equal() +
   theme_bw(base_size = 13) +
   labs(
@@ -339,21 +410,10 @@ hotspot.centroid.plot <- ggplot(hotspot.centroids,
   )
 hotspot.centroid.plot
 
-hotspot.traj.plot <- ggplot(
-  hotspot.centroids.traj,
-  aes(year, step_length, colour = metric)) +
-  geom_line() +
-  facet_wrap(~ site) +
-  theme_minimal(base_size = 13) +
-  labs(
-    y = "Step length of hotspot trajectory",
-  )
-
-hotspot.traj.plot
 
 hotspot.direction.tests <- hotspot.centroids.traj %>%
   filter(!is.na(angle)) %>%
-  group_by(project, site, metric) %>%
+  group_by(project, system, metric) %>%
   summarise(
     n_steps   = n(),
     rayleigh_p = rayleigh.test(circular(angle))$p.value,
@@ -365,20 +425,216 @@ hotspot.direction.tests <- hotspot.centroids.traj %>%
 hotspot.direction.tests
 
 
-hotspot.angle.plot <- ggplot(hotspot.centroids.traj, aes(x = year, y = angle, group = interaction(site, metric), color = metric)) +
-  geom_line() +
-  scale_y_continuous(
-    breaks = c(-pi, -pi/2, 0, pi/2, pi),
-    labels = c("−π", "−π/2", "0", "π/2", "π")
-  ) +
-  facet_wrap(.~site, ncol = 9) +
+
+hotspots.centroids.traj.circ <- hotspot.centroids.traj %>%
+  mutate(angle.circ = circular(angle))
+
+
+projects <- sort(unique(hotspot.centroids.traj$project))
+
+
+pairs <- combn(projects, 2, simplify = FALSE)
+
+hotspot_pairwise_results_biomass <- purrr::map_dfr(pairs, function(p) {
+  a1 <- hotspots.centroids.traj.circ %>% filter(project == p[1] & metric == "biomass") %>% pull(angle.circ)
+  a2 <- hotspots.centroids.traj.circ %>% filter(project == p[2] & metric == "biomass") %>% pull(angle.circ)
+  
+  tst <- watson.two.test(a1, a2)
+  
+  tibble(
+    project1 = p[1],
+    project2 = p[2],
+    statistic = unname(tst$statistic),
+    p_value = unname(tst$alpha)
+  )
+}) %>%
+  mutate(p_adj = p.adjust(p_value, method = "BH")) %>%
+  arrange(p_adj)
+hotspot_pairwise_results_biomass
+
+hotspot_pairwise_results_density<- purrr::map_dfr(pairs, function(p) {
+  a1 <- hotspots.centroids.traj.circ %>% filter(project == p[1] & metric == "density") %>% pull(angle.circ)
+  a2 <- hotspots.centroids.traj.circ %>% filter(project == p[2] & metric == "density") %>% pull(angle.circ)
+  
+  tst <- watson.two.test(a1, a2)
+  
+  tibble(
+    project1 = p[1],
+    project2 = p[2],
+    statistic = unname(tst$statistic),
+    p_value = unname(tst$alpha)
+  )
+}) %>%
+  mutate(p_adj = p.adjust(p_value, method = "BH")) %>%
+  arrange(p_adj)
+hotspot_pairwise_results_density
+
+
+hotspot.centroids.traj.dir <- hotspot.centroids.traj %>%
+  filter(!is.na(dPC1), !is.na(dPC2)) %>%
+  mutate(axis_ratio = abs(dPC1) / (abs(dPC1) + abs(dPC2)))
+
+hot.dirs.biomass <- hotspot.centroids.traj.dir %>%
+  filter(metric == "biomass")%>%
+  mutate(n = n()) %>%
+  mutate(axis_ratio = (axis_ratio * (n - 1) + 0.5) / n)
+
+m2biomass <- brm(axis_ratio ~ project + (1|system), data = hot.dirs.biomass, family = "beta", cores = 4, chains = 4, backend = "cmdstanr")
+summary(m2biomass)
+
+
+hot.dirs.density <- hotspot.centroids.traj.dir %>%
+  filter(metric == "density") %>%
+  mutate(n = n()) %>%
+  mutate(axis_ratio = (axis_ratio * (n - 1) + 0.5) / n)
+
+m2density <- brm(axis_ratio ~ project + (1|system), data = hot.dirs.density, family = "beta", cores = 4, chains = 4, backend = "cmdstanr")
+summary(m2density)
+
+### --- time 
+nd_time <- expand_grid(
+  project = unique(hot.dirs.biomass$project)) %>%
+  filter(project != "VCR")
+
+ep <- fitted(
+  m2biomass,
+  newdata = nd,
+  re_formula = NA,     # population-level only
+  summary = TRUE
+) %>%
+  as_tibble() %>%
+  bind_cols(nd) %>%
+  rename(mean = Estimate, lwr = Q2.5, upr = Q97.5)
+
+ep
+
+project.direction.plot <- ggplot(ep, aes(x = reorder(project, mean), y = mean)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = lwr, ymax = upr), width = 0.15) +
+  coord_flip() +
+  theme_minimal(base_size = 14) +
+  labs(
+    x = NULL,
+    y = "Expected axis dominance (|dPC1| / (|dPC1| + |dPC2|))",
+    title = "Projects differ in which trait axis dominates centroid movement"
+  )
+project.direction.plot
+
+
+nd_time <- expand_grid(
+  project = unique(hot.dirs.density$project)) %>%
+  filter(project != "VCR")
+
+ep <- fitted(
+  m2density,
+  newdata = nd,
+  re_formula = NA,     # population-level only
+  summary = TRUE
+) %>%
+  as_tibble() %>%
+  bind_cols(nd) %>%
+  rename(mean = Estimate, lwr = Q2.5, upr = Q97.5)
+
+ep
+
+project.direction.plot <- ggplot(ep, aes(x = reorder(project, mean), y = mean)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = lwr, ymax = upr), width = 0.15) +
+  coord_flip() +
+  theme_minimal(base_size = 14) +
+  labs(
+    x = NULL,
+    y = "Expected axis dominance (|dPC1| / (|dPC1| + |dPC2|))",
+    title = "Projects differ in which trait axis dominates centroid movement"
+  )
+project.direction.plot
+
+
+
+centroids.dir.abs <- hot.dirs.biomass %>%
+  mutate(adPC1 = abs(dPC1), adPC2 = abs(dPC2)) 
+
+angle.data <- hotspots.centroids.traj.circ %>%
+  filter(!is.na(angle)) %>%
+  mutate(angle_wrapped = angle)  # already in [-pi, pi] from atan2
+
+rosette.plots.project <- ggplot(angle.data %>% filter(metric == "biomass"), aes(angle_wrapped, fill = project)) +
+  geom_histogram(binwidth = pi/8, boundary = 0) +
+  coord_polar(start = pi/2, direction = 1) +   # rotate 90° counterclockwise
+  facet_wrap(~ project, scales = "free_y") +
+  scale_fill_viridis_d() +
+  theme_bw(base_size = 13) +
+  labs(
+    x = NULL, y = "Count",
+    title = "Centroid movement directions: biomass"
+  )
+rosette.plots.project
+
+rosette.plots.project <- ggplot(angle.data %>% filter(metric == "density"), aes(angle_wrapped, fill = project)) +
+  geom_histogram(binwidth = pi/8, boundary = 0) +
+  coord_polar(start = pi/2, direction = 1) +   # rotate 90° counterclockwise
+  facet_wrap(~ project, scales = "free") +
+  scale_fill_viridis_d() +
+  theme_bw(base_size = 13) +
+  labs(
+    x = NULL, y = "Count",
+    title = "Centroid movement directions: density"
+  )
+rosette.plots.project
+
+
+centroid.tests <- centroids.traj %>%
+  filter(!is.na(angle)) %>%
+  group_by(system) %>%
+  summarise(
+    p = circular::rayleigh.test(circular(angle))$p.value,
+    mean_dir = as.numeric(mean(circular(angle))),
+    .groups = "drop"
+  ) %>%
+  arrange(p) %>%
+  left_join(comm.meta)
+centroid.tests
+
+
+centroid.traj.dir <- centroids.traj %>%
+  filter(!is.na(dPC1)) %>%
+  pivot_longer(cols = c(dPC1, dPC2),
+               names_to = "axis",
+               values_to = "delta")
+
+centroid.traj.plot <- ggplot(centroid.traj.dir, aes(axis, abs(delta), fill = project)) +
+  geom_boxplot() +
+  facet_wrap(~ project, scales = "free_y") +
+  theme_bw(base_size = 14) +
+  labs(
+    y = "Magnitude of movement",
+    x = "",
+  )
+centroid.traj.plot
+
+
+step_lengths_time <- centroids.traj %>%
+  filter(!is.na(step_length)) %>%
+  ggplot(aes(year, step_length, colour = project)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(se = FALSE, method = "loess", span = 0.5) +
+  facet_wrap(.~project, scales = "free_y") +
   theme_bw(base_size = 14) +
   scale_color_viridis_d() +
   labs(
     x = "Year",
-    y = "Direction of movement",
-    title = "Year-to-year direction of functional centroid shifts"
-  )
+    y = "Centroid step length",
+  ) 
+step_lengths_time
+
+
+
+
+
+
+#######################
+######## CODE GRAVEYARD
+#######################
 
 hotspot.angle.plot
 
