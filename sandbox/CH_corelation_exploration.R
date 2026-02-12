@@ -15,7 +15,7 @@
 `%>%` <- magrittr::`%>%`
 
 # Load libraries
-librarian::shelf(tidyverse, dplyr, funbiogeo, ggplot2, mFD, tibble)
+librarian::shelf(tidyverse, dplyr, funbiogeo, ggplot2, mFD, tibble, patchwork)
 
 # Get set up
 source("00_setup.R")
@@ -23,13 +23,10 @@ source("00_setup.R")
 # Clear environment & collect garbage
 rm(list = ls()); gc()
 
-suppressPackageStartupMessages({
-  library(dplyr)
-  library(ggplot2)
-  library(patchwork)
-})
 
 # 1 - Load data =================================================================
+# Be sure to pull uodated .rds if running after data has been updated
+
 sp_tr_zscore <- readRDS(
   "~/lter-sparc-consumer-fxn-diversity-analysis/transformed_data/sp_tr_zscore.rds"
 )
@@ -37,6 +34,9 @@ sp_tr_zscore <- readRDS(
 # 2 - Helpers ===================================================================
 
 `%||%` <- function(lhs, rhs) if (is.null(lhs)) rhs else lhs
+
+
+#just want traits we are interested in
 
 prep_trait_data <- function(df, taxon_keep) {
   df %>%
@@ -51,6 +51,8 @@ prep_trait_data <- function(df, taxon_keep) {
     filter(!is.na(taxon), taxon %in% taxon_keep)
 }
 
+#Scatterplot function - update visuals as desired
+
 trait_scatter_lm <- function(df, x, y, color = "project", title = NULL) {
   ggplot(df, aes(x = .data[[x]], y = .data[[y]], color = .data[[color]])) +
     geom_point(size = 1) +
@@ -62,6 +64,8 @@ trait_scatter_lm <- function(df, x, y, color = "project", title = NULL) {
     ) +
     theme_grey()
 }
+
+#puts all scatterplots for a taxon in one panel
 
 make_taxon_plot_set <- function(df_taxon, trait_pairs, taxon_label) {
   plots <- lapply(trait_pairs, function(pr) {
@@ -85,7 +89,12 @@ make_taxon_plot_set <- function(df_taxon, trait_pairs, taxon_label) {
 
 # 3 - Config ====================================================================
 
+# As of now, zooplankton data won't run - not enough trait coverage, but keeping 
+# it in here so when it is updated we are ready to go
+
 taxon_keep <- c("Fish", "Birds", "Zooplankton")
+
+# Run all 6 pairwise trait combos 
 
 trait_pairs <- list(
   c("tr.age.zt", "tr.mass.adult.zt"),
@@ -101,6 +110,7 @@ trait_pairs <- list(
 d <- prep_trait_data(sp_tr_zscore, taxon_keep = taxon_keep)
 
 # Split by taxa and build plot grids
+
 taxon_groups <- split(d, d$taxon)
 
 plot_sets <- lapply(names(taxon_groups), function(tx) {
@@ -110,20 +120,30 @@ plot_sets <- lapply(names(taxon_groups), function(tx) {
 names(plot_sets) <- names(taxon_groups)
 
 # 5 - View results ==============================================================
-# Show one taxa grid:
-plot_sets$Fish$grid
+# If you want to only show one taxa grid:
+# plot_sets$Fish$grid
 
-# Or print all taxa grids sequentially:
+# Or if you want to print all taxa grids sequentially:
+
 for (tx in names(plot_sets)) {
   print(plot_sets[[tx]]$grid)
   invisible(readline(paste0("Next taxon (", tx, " done). Press Enter ")))
 }
 
+
+
+
+
+
+
+
+
+
+
+
 # ==============================================================================
-# Correlation matrices + plots (run AFTER your trait scatterplots)
-# Assumes you already created:
-#   d <- prep_trait_data(sp_tr_zscore, taxa_keep = c("Fish","Birds","Zooplankton"))
-# where d contains: taxa + the .zt trait columns used below
+# Correlation matrices + plotting
+# Assumes you already ran the above code first to subset the data
 # ==============================================================================
 
 library(corrplot)
@@ -167,7 +187,7 @@ plot_cor_set <- function(x, cor_mat, title_prefix) {
   )
 }
 
-# ---- run by taxa (reuses your existing filtered data 'd') ----
+# ---- run by taxa (reuses existing filtered data 'd') ----
 stopifnot(exists("d"))
 stopifnot("taxon" %in% names(d))
 stopifnot(all(traits_zt %in% names(d)))
@@ -207,7 +227,7 @@ corr_results <- lapply(names(taxon_groups), function(tx) {
 })
 names(corr_results) <- names(taxon_groups)
 
-# Inspect later if you want:
+# If you want individual Taxon results later:
 # corr_results$Fish$cor
 # corr_results$Birds$cor
 # corr_results$Zooplankton$cor
