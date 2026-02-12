@@ -212,6 +212,7 @@ saveRDS(results_df,
         file.path("transformed_data",
                   "fd_ind_time.rds"))
 
+# Pisco:
 results_df_Coastal <- results_df %>% 
   dplyr::filter(project %in% c("COASTAL_CEN", "COASTAL_SOUTH"))
 
@@ -225,6 +226,7 @@ fric_plot_Coastal <- ggplot2::ggplot(data = results_df_Coastal,
   ggplot2::ggtitle("Functional Richness - Coastal")
 fric_plot_Coastal
 
+# Pisco Central
 results_df_CoastalCEN <- results_df %>% 
   dplyr::filter(project %in% c("COASTAL_CEN"))
 fric_plot_CoastalCEN <- ggplot2::ggplot(data = results_df_CoastalCEN,
@@ -265,3 +267,129 @@ fide3_plot_CoastalCEN <- ggplot2::ggplot(data = results_df_CoastalCEN,
   ggplot2::theme_bw() +
   ggplot2::ggtitle("Functional Identity PC 3 - Coastal CEN")
 fide3_plot_CoastalCEN
+
+# FCE
+results_df_FCE <- results_df %>% 
+  dplyr::filter(project %in% c("FCE"))
+
+fric_plot_FCE <- ggplot2::ggplot(data = results_df_FCE,
+                                        ggplot2::aes(x = year, y = fric)) +
+  ggplot2::geom_point(alpha = 0.6) +
+  ggplot2::geom_smooth(method = "loess", se = TRUE) +
+  ggplot2::facet_wrap(~ system, scales = "free_y") +
+  ggplot2::theme_bw() +
+  ggplot2::ggtitle("Functional Richness - FCE")
+fric_plot_FCE
+
+fide1_plot_FCE <- ggplot2::ggplot(data = results_df_FCE,
+                                         ggplot2::aes(x = year, y = fide_PC1)) +
+  ggplot2::geom_point(alpha = 0.6) +
+  ggplot2::geom_smooth(method = "loess", se = TRUE) +
+  ggplot2::facet_wrap(~ system, scales = "free_y") +
+  ggplot2::theme_bw() +
+  ggplot2::ggtitle("Functional Identity PC1 - FCE")
+fide1_plot_FCE
+
+fide2_plot_FCE <- ggplot2::ggplot(data = results_df_FCE,
+                                         ggplot2::aes(x = year, y = fide_PC2)) +
+  ggplot2::geom_point(alpha = 0.6) +
+  ggplot2::geom_smooth(method = "loess", se = TRUE) +
+  ggplot2::facet_wrap(~ system, scales = "free_y") +
+  ggplot2::theme_bw() +
+  ggplot2::ggtitle("Functional Identity PC2 - FCE")
+fide2_plot_FCE
+
+# MCR
+results_df_MCR <- results_df %>% 
+  dplyr::filter(project %in% c("MCR"))
+
+fric_plot_MCR <- ggplot2::ggplot(data = results_df_MCR,
+                                 ggplot2::aes(x = year, y = fric)) +
+  ggplot2::geom_point(alpha = 0.6) +
+  ggplot2::geom_smooth(method = "loess", se = TRUE) +
+  ggplot2::facet_wrap(~ system, scales = "free_y") +
+  ggplot2::theme_bw() +
+  ggplot2::ggtitle("Functional Richness - MCR")
+fric_plot_MCR
+
+fide1_plot_MCR <- ggplot2::ggplot(data = results_df_MCR,
+                                  ggplot2::aes(x = year, y = fide_PC1)) +
+  ggplot2::geom_point(alpha = 0.6) +
+  ggplot2::geom_smooth(method = "loess", se = TRUE) +
+  ggplot2::facet_wrap(~ system, scales = "free_y") +
+  ggplot2::theme_bw() +
+  ggplot2::ggtitle("Functional Identity PC1 - MCR")
+fide1_plot_MCR
+
+fide2_plot_MCR <- ggplot2::ggplot(data = results_df_MCR,
+                                  ggplot2::aes(x = year, y = fide_PC2)) +
+  ggplot2::geom_point(alpha = 0.6) +
+  ggplot2::geom_smooth(method = "loess", se = TRUE) +
+  ggplot2::facet_wrap(~ system, scales = "free_y") +
+  ggplot2::theme_bw() +
+  ggplot2::ggtitle("Functional Identity PC2 - MCR")
+fide2_plot_MCR
+
+# SBC
+results_df_SBC <- results_df %>% 
+  dplyr::filter(project %in% c("SBC"))
+
+fric_plot_SBC <- ggplot2::ggplot(data = results_df_SBC,
+                                 ggplot2::aes(x = year, y = fric)) +
+  ggplot2::geom_point(alpha = 0.6) +
+  ggplot2::geom_smooth(method = "loess", se = TRUE) +
+  ggplot2::facet_wrap(~ system, scales = "free_y") +
+  ggplot2::theme_bw() +
+  ggplot2::ggtitle("Functional Richness - SBC")
+fric_plot_SBC
+
+fide1_plot_SBC <- ggplot2::ggplot(data = results_df_SBC,
+                                  ggplot2::aes(x = year, y = fide_PC1)) +
+  ggplot2::geom_point(alpha = 0.6) +
+  ggplot2::geom_smooth(method = "loess", se = TRUE) +
+  ggplot2::facet_wrap(~ system, scales = "free_y") +
+  ggplot2::theme_bw() +
+  ggplot2::ggtitle("Functional Identity PC1 - SBC")
+fide1_plot_SBC
+
+fide2_plot_SBC <- ggplot2::ggplot(data = results_df_SBC,
+                                  ggplot2::aes(x = year, y = fide_PC2)) +
+  ggplot2::geom_point(alpha = 0.6) +
+  ggplot2::geom_smooth(method = "loess", se = TRUE) +
+  ggplot2::facet_wrap(~ system, scales = "free_y") +
+  ggplot2::theme_bw() +
+  ggplot2::ggtitle("Functional Identity PC2 - SBC")
+fide2_plot_SBC
+
+# VCR
+results_df_VCR <- results_df %>% 
+  dplyr::filter(project %in% c("VCR"))
+
+fric_plot_VCR <- ggplot2::ggplot(data = results_df_VCR,
+                                 ggplot2::aes(x = year, y = fric)) +
+  ggplot2::geom_point(alpha = 0.6) +
+  ggplot2::geom_smooth(method = "loess", se = TRUE) +
+  ggplot2::facet_wrap(~ system, scales = "free_y") +
+  ggplot2::theme_bw() +
+  ggplot2::ggtitle("Functional Richness - VCR")
+fric_plot_VCR
+
+fide1_plot_VCR <- ggplot2::ggplot(data = results_df_VCR,
+                                  ggplot2::aes(x = year, y = fide_PC1)) +
+  ggplot2::geom_point(alpha = 0.6) +
+  ggplot2::geom_smooth(method = "loess", se = TRUE) +
+  ggplot2::facet_wrap(~ system, scales = "free_y") +
+  ggplot2::theme_bw() +
+  ggplot2::ggtitle("Functional Identity PC1 - VCR")
+fide1_plot_VCR
+
+fide2_plot_VCR <- ggplot2::ggplot(data = results_df_VCR,
+                                  ggplot2::aes(x = year, y = fide_PC2)) +
+  ggplot2::geom_point(alpha = 0.6) +
+  ggplot2::geom_smooth(method = "loess", se = TRUE) +
+  ggplot2::facet_wrap(~ system, scales = "free_y") +
+  ggplot2::theme_bw() +
+  ggplot2::ggtitle("Functional Identity PC2 - VCR")
+fide2_plot_VCR
+
+
