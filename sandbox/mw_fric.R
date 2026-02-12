@@ -73,7 +73,7 @@ dt_og <- dt |>
       filter(!(outlier_hi & elasmo)) |>
       select(-mean_dmperind, -sd_dmperind, -upper_bound, -outlier_hi, -elasmo)
 
-test <- anti_join(dt, dt_og)
+# test <- anti_join(dt, dt_og)
 
 ### check to see NA fixes incorporated
 na_count_per_column <- sapply(dt, function(x) sum(is.na(x)))
@@ -194,12 +194,12 @@ dt2c <- dt2b |>
       ) |> 
       select(project, habitat, site, year, month, system, scientific_name, 
              total_n_area, total_p_area, total_bm_area, density) |> 
-      group_by(project, year, habitat, system, month) |> 
+      group_by(project, habitat, site, year, month, system) |>
       summarize(
             n = sum(total_n_area),
             p = sum(total_p_area),
             bm = sum(total_bm_area)
-      ) |> 
+      ) |>
       group_by(project, year, habitat, system) |> 
       summarize(
             n = mean(n, na.rm = TRUE),
