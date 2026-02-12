@@ -38,17 +38,17 @@ sp_tr_zscore <- readRDS(
 
 `%||%` <- function(lhs, rhs) if (is.null(lhs)) rhs else lhs
 
-prep_trait_data <- function(df, taxa_keep) {
+prep_trait_data <- function(df, taxon_keep) {
   df %>%
     select(
       project, habitat, scientific_name, class, sp.proj,
-      taxa,
+      taxon,
       tr.age.zt,
       tr.mass.adult.zt,
       tr.reproduction.unified.zt,
       tr.trophic.level.zt
     ) %>%
-    filter(!is.na(taxa), taxa %in% taxa_keep)
+    filter(!is.na(taxon), taxon %in% taxon_keep)
 }
 
 trait_scatter_lm <- function(df, x, y, color = "project", title = NULL) {
@@ -85,7 +85,7 @@ make_taxon_plot_set <- function(df_taxon, trait_pairs, taxon_label) {
 
 # 3 - Config ====================================================================
 
-taxa_keep <- c("Fish", "Birds", "Zooplankton")
+taxon_keep <- c("Fish", "Birds", "Zooplankton")
 
 trait_pairs <- list(
   c("tr.age.zt", "tr.mass.adult.zt"),
@@ -98,16 +98,16 @@ trait_pairs <- list(
 
 # 4 - Run =======================================================================
 
-d <- prep_trait_data(sp_tr_zscore, taxa_keep = taxa_keep)
+d <- prep_trait_data(sp_tr_zscore, taxon_keep = taxon_keep)
 
 # Split by taxa and build plot grids
-taxa_groups <- split(d, d$taxa)
+taxon_groups <- split(d, d$taxon)
 
-plot_sets <- lapply(names(taxa_groups), function(tx) {
-  df_tx <- taxa_groups[[tx]]
+plot_sets <- lapply(names(taxon_groups), function(tx) {
+  df_tx <- taxon_groups[[tx]]
   make_taxon_plot_set(df_tx, trait_pairs, taxon_label = tx)
 })
-names(plot_sets) <- names(taxa_groups)
+names(plot_sets) <- names(taxon_groups)
 
 # 5 - View results ==============================================================
 # Show one taxa grid:
@@ -116,7 +116,7 @@ plot_sets$Fish$grid
 # Or print all taxa grids sequentially:
 for (tx in names(plot_sets)) {
   print(plot_sets[[tx]]$grid)
-  invisible(readline(paste0("Next taxa (", tx, " done). Press Enter ")))
+  invisible(readline(paste0("Next taxon (", tx, " done). Press Enter ")))
 }
 
 # ==============================================================================
@@ -169,28 +169,28 @@ plot_cor_set <- function(x, cor_mat, title_prefix) {
 
 # ---- run by taxa (reuses your existing filtered data 'd') ----
 stopifnot(exists("d"))
-stopifnot("taxa" %in% names(d))
+stopifnot("taxon" %in% names(d))
 stopifnot(all(traits_zt %in% names(d)))
 
-taxa_groups <- split(d, d$taxa)
+taxon_groups <- split(d, d$taxon)
 
-corr_results <- lapply(names(taxa_groups), function(tx) {
-  g <- taxa_groups[[tx]]
+corr_results <- lapply(names(taxon_groups), function(tx) {
+  g <- taxon_groups[[tx]]
   x <- clean_numeric_matrix(g, traits_zt)
   
   if (nrow(x) < 3 || ncol(x) < 2) {
-    message("Skipping taxa=", tx, " (too few rows or varying trait cols).")
-    return(list(taxa = tx, cor = NULL, data = x))
+    message("Skipping taxon=", tx, " (too few rows or varying trait cols).")
+    return(list(taxon = tx, cor = NULL, data = x))
   }
   
   corr_mat <- compute_cor(x, method = "pearson", use = "pairwise.complete.obs")
   if (is.null(corr_mat)) {
-    message("Skipping taxa=", tx, " (cor matrix NULL).")
-    return(list(taxa = tx, cor = NULL, data = x))
+    message("Skipping taxon=", tx, " (cor matrix NULL).")
+    return(list(taxon = tx, cor = NULL, data = x))
   }
   
   cat("\n====================\n")
-  cat("Taxa:", tx, "\n")
+  cat("Taxon:", tx, "\n")
   cat("n rows:", nrow(g), " | traits used:", paste(colnames(x), collapse = ", "), "\n")
   cat("====================\n")
   print(round(corr_mat, 3))
@@ -198,14 +198,14 @@ corr_results <- lapply(names(taxa_groups), function(tx) {
   plot_cor_set(
     x = x,
     cor_mat = corr_mat,
-    title_prefix = paste0("Taxa=", tx, " | .zt | n=", nrow(g))
+    title_prefix = paste0("Taxon=", tx, " | .zt | n=", nrow(g))
   )
   
-  invisible(readline("Next taxa correlation plots? Press Enter "))
+  invisible(readline("Next taxon correlation plots? Press Enter "))
   
-  list(taxa = tx, cor = corr_mat, data = x)
+  list(taxon = tx, cor = corr_mat, data = x)
 })
-names(corr_results) <- names(taxa_groups)
+names(corr_results) <- names(taxon_groups)
 
 # Inspect later if you want:
 # corr_results$Fish$cor
