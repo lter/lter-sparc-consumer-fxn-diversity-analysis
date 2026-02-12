@@ -456,3 +456,75 @@ trend_results_cwm <- cwm_ts_long |>
 glimpse(trend_results_cwm)
 nacheck(trend_results_cwm)
 
+# visualize trends (CWM traits) --------------------------------------------
+
+metric_order <- c(
+      "cwm_tr.age.zt",
+      "cwm_tr.trophic.level.zt",
+      "cwm_tr.fecundity.zt",
+      "cwm_tr.reproduction.unified.zt",
+      "cwm_tr.mass.adult.zt"
+      # add more here if you have them, e.g. "cwm_tr.length.adult.zt"
+)
+
+pretty_names <- c(
+      "cwm_tr.age.zt"                  = "Age",
+      "cwm_tr.trophic.level.zt"        = "Trophic level",
+      "cwm_tr.fecundity.zt"            = "Fecundity",
+      "cwm_tr.reproduction.unified.zt" = "Reproduction",
+      "cwm_tr.mass.adult.zt"           = "Adult mass"
+)
+
+trend_plot_df <- trend_results_cwm |>
+      mutate(
+            variable = factor(variable, levels = metric_order),
+            variable_pretty = pretty_names[as.character(variable)],
+            measure = "Trait",
+            zooplankton_site = project %in% c("CCE", "NGA")
+      ) |>
+      filter(!is.na(project), !is.na(variable_pretty)) |>
+      mutate(significance = case_when(
+            significant == "Not significant" ~ "None",
+            significant == "Marginal" ~ "Marginal",
+            significant %in% c("Increase", "Decline") ~ "Significant",
+            TRUE ~ NA_character_
+      ))
+
+glimpse(trend_plot_df)
+unique(trend_plot_df$significance)
+
+sig_palette <- c(
+      "None" = "white",
+      "Marginal" = "black",
+      "Significant" = "red"
+)
+
+trait_plot <- function(trait_name) {
+      trend_plot_df |>
+            filter(variable_pretty == trait_name) |>
+            ggplot(aes(x = project, y = slope)) +
+            geom_hline(yintercept = 0, linetype = "solid", color = "black") +
+            geom_boxplot(width = 0.5, linewidth = 1, outlier.shape = NA, color = "black") +
+            geom_jitter(
+                  aes(fill = significance, shape = zooplankton_site),
+                  color = "black", size = 4, width = 0.25, alpha = 1
+            ) +
+            scale_fill_manual(values = sig_palette) +
+            scale_shape_manual(values = c(`FALSE` = 21, `TRUE` = 24)) +
+            labs(y = NULL, x = NULL, fill = "Significance", shape = "Zooplankton site") +
+            theme_classic() +
+            theme(
+                  axis.text.x = element_text(face = "bold", color = "black", size = 12),
+                  axis.text.y = element_text(face = "bold", color = "black", size = 12),
+                  strip.text = element_text(face = "bold", color = "black", size = 14),
+                  legend.position = "right"
+            )
+}
+
+a <- trait_plot("Age")
+b <- trait_plot("Trophic level")
+c <- trait_plot("Fecundity")
+d <- trait_plot("Reproduction")
+e <- trait_plot("Adult mass")
+
+a; b; c; d; e
