@@ -87,7 +87,7 @@ centroid.plot <- ggplot(centroids, aes(centroid_PC1, centroid_PC2, group = site_
   coord_equal() +
   scale_color_viridis_d() +
   theme_bw(base_size = 14) +
-  facet_wrap(.~fct_reorder(site, project)) +
+  facet_wrap(.~fct_reorder(site, project), ncol = 9) +
   labs(
     x = "PC1",
     y = "PC2",
@@ -127,9 +127,9 @@ centroid.tests <- centroids.traj %>%
 centroid.tests
 
 rosette.plot <- ggplot(centroids.traj, aes(angle, fill = project)) +
-  geom_histogram(binwidth = pi/12) +
+  geom_histogram(binwidth = pi/6) +
   coord_polar() +
-  facet_wrap(~ site) +
+  facet_wrap(~ site, scales = "free_y", ncol = 9) +
   theme_bw() +
   scale_fill_viridis_d()
   
@@ -328,7 +328,7 @@ hotspot.centroid.plot <- ggplot(hotspot.centroids,
             alpha = 0.9) +
   geom_point(aes(size = year), alpha = 0.8) +
   scale_color_viridis_d() +
-  facet_wrap(~ site) +
+  facet_wrap(~ site, ncol = 9) +
   coord_equal() +
   theme_bw(base_size = 13) +
   labs(
@@ -371,7 +371,7 @@ hotspot.angle.plot <- ggplot(hotspot.centroids.traj, aes(x = year, y = angle, gr
     breaks = c(-pi, -pi/2, 0, pi/2, pi),
     labels = c("−π", "−π/2", "0", "π/2", "π")
   ) +
-  facet_wrap(.~site) +
+  facet_wrap(.~site, ncol = 9) +
   theme_bw(base_size = 14) +
   scale_color_viridis_d() +
   labs(
@@ -387,7 +387,8 @@ hotspot.rosette.plot.density <- ggplot(hotspot.centroids.traj %>% filter(metric 
   coord_polar() +
   facet_wrap(~ site) +
   theme_bw() +
-  scale_fill_viridis_d()
+  scale_fill_viridis_d() +
+  labs(title = "density")
 
 hotspot.rosette.plot.density
 
@@ -397,9 +398,13 @@ hotspot.rosette.plot.biomass <- ggplot(hotspot.centroids.traj %>% filter(metric 
   coord_polar() +
   facet_wrap(~ site) +
   theme_bw() +
-  scale_fill_viridis_d()
+  scale_fill_viridis_d()+
+  labs(title = "biomass")
 
 hotspot.rosette.plot.biomass
+
+rosette.plots <- hotspot.rosette.plot.density + hotspot.rosette.plot.biomass
+
 
 # hotspot.centroid.traj.dir <- hotspot.centroids.traj %>%
 #   filter(!is.na(dPC1)) %>%
