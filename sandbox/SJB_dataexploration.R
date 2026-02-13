@@ -3,31 +3,42 @@
 ### IMPORTANT: requires running the script LDLA_dataexploration.R
 ### LOAD RDS FILES FOR TRAITS/COORDINATES AND COMMUNITIES
 
+library(tidyverse)
+library(brms) 
+library(circular)
+
+# load trait space coordinates for all species
 traits.cleaned <- as.data.frame(readRDS("transformed_data/sp_faxes_coord.rds")) %>%
   mutate(scientific_name = rownames(.))
 
+# load community data, currently called "Macks_data.rds"
 community.data <- as.data.frame(readRDS("transformed_data/Macks_data.rds"))
+
+# some checking
 table(community.data$project)
 table(community.data$habitat)
 table(community.data$system)
 
+# create a community metadata df
 comm.meta <- community.data %>%
   dplyr::select(project, habitat, system)
 
+# make sure only rows with species are retained
 comm.filtered <- community.data %>%
   filter(density > 0)
 
+# join community data with trait space coordinates
 traitsxcomms <- comm.filtered %>%
   ungroup() %>%
   inner_join(traits.cleaned, by = "scientific_name") %>%
   distinct()
 
+# check which species are not in trait dataset
 traitsanti <- comm.filtered %>%
   anti_join(traits.cleaned, by = "scientific_name") %>%
   dplyr::select(scientific_name) %>%
   distinct()
-
-summary(traitsxcomms)
+traitsanti
 
 ### --- calculate centroids
 centroids <- traitsxcomms %>%
@@ -38,11 +49,12 @@ centroids <- traitsxcomms %>%
     n_species = n(),                        # nice to keep track
     .groups = "drop"
   ) %>%
+  # standardize time series from 0 to 1
   mutate(t01_proj = (year - min(year, na.rm = TRUE)) / (max(year, na.rm = TRUE) - min(year, na.rm = TRUE)))
 
 
 
-### calculate trajectores and step lengths using Pythagorean theorem
+### --- calculate trajectories and step lengths using Pythagorean theorem
 centroids.traj <- centroids %>%
   arrange(habitat, project, system, year) %>%
   group_by(habitat, project, system) %>%
@@ -59,14 +71,14 @@ centroids.traj <- centroids %>%
 
 
 
-### plot steps
+### plot steps --- if desired, change grouping structure above to be on projects, not systems
 centroid.plot <- ggplot(centroids, aes(centroid_PC1, centroid_PC2, group = system, color = project)) +
   geom_path(alpha = 0.95) +
   geom_point(aes(fill = t01_proj), size = 2, shape = 21, color = "black") +
   coord_equal() +
   scale_color_viridis_d() +
   theme_bw(base_size = 14) +
-  facet_wrap(.~project, ncol = 9) +
+  facet_wrap(.~project, ncol = 3) +
   labs(
     x = "PC1",
     y = "PC2",
@@ -76,33 +88,33 @@ centroid.plot <- ggplot(centroids, aes(centroid_PC1, centroid_PC2, group = syste
   )
 centroid.plot
 
+# angle.plot <- ggplot(centroids.traj, aes(year, angle, group = system, color = project)) +
+#   geom_line() +
+#   scale_y_continuous(
+#     breaks = c(-pi, -pi/2, 0, pi/2, pi),
+#     labels = c("−π", "−π/2", "0", "π/2", "π")
+#   ) +
+#   facet_wrap(.~project) +
+#   theme_bw(base_size = 14) +
+#   scale_color_viridis_d() +
+#   labs(
+#     x = "Year",
+#     y = "Direction of movement",
+#     title = "Year-to-year direction of functional centroid shifts"
+#   )
+# 
+# angle.plot
 
-angle.plot <- ggplot(centroids.traj, aes(year, angle, group = system, color = project)) +
-  geom_line() +
-  scale_y_continuous(
-    breaks = c(-pi, -pi/2, 0, pi/2, pi),
-    labels = c("−π", "−π/2", "0", "π/2", "π")
-  ) +
-  facet_wrap(.~project) +
-  theme_bw(base_size = 14) +
-  scale_color_viridis_d() +
-  labs(
-    x = "Year",
-    y = "Direction of movement",
-    title = "Year-to-year direction of functional centroid shifts"
-  )
-
-angle.plot
-
+# turn angles into a cricular column
 centroids.traj.circ <- centroids.traj %>%
   mutate(angle.circ = circular(angle))
 
-
+# set up pairwise comparisons
 projects <- sort(unique(centroids.traj.circ$project))
-
 
 pairs <- combn(projects, 2, simplify = FALSE)
 
+# cacluclate watson.two.tests for each pari of projects to assess differences in angles
 pairwise_results <- purrr::map_dfr(pairs, function(p) {
   a1 <- centroids.traj.circ %>% filter(project == p[1]) %>% pull(angle.circ)
   a2 <- centroids.traj.circ %>% filter(project == p[2]) %>% pull(angle.circ)
@@ -117,26 +129,27 @@ pairwise_results <- purrr::map_dfr(pairs, function(p) {
   )
 })
 
+### check results
 pairwise_results %>% arrange(p_value)
 pairwise_results %>%
   mutate(p_adj = p.adjust(p_value, method = "BH")) %>%
   arrange(p_adj)
 
-
+### look at directional movements across the two axes
 centroids.traj.dir <- centroids.traj %>%
   filter(!is.na(dPC1), !is.na(dPC2)) %>%
   mutate(axis_ratio = abs(dPC1) / (abs(dPC1) + abs(dPC2)))
 
-hist(centroids.traj.dir$axis_ratio)
-
+### quick and dirty Bayesian model testing project effects on axis ratios (propensity to move on PC1 or PC2)
 m1 <- brm(axis_ratio ~ project + (1|system), data = centroids.traj.dir, family = "beta", cores = 4, chains = 4, backend = "cmdstanr")
 summary(m1)
 
-## --- projects
-
+## --- plot mean posterior estimates
+### new dataset
 nd <- expand_grid(centroids.traj.dir, project = sort(unique(centroids.traj.dir$project))) %>%
   filter(project != "VCR")
 
+### fit values
 ep <- fitted(
   m1,
   newdata = nd,
@@ -147,8 +160,7 @@ ep <- fitted(
   bind_cols(nd) %>%
   rename(mean = Estimate, lwr = Q2.5, upr = Q97.5)
 
-ep
-
+### plot 
 project.direction.plot <- ggplot(ep, aes(x = reorder(project, mean), y = mean)) +
   geom_point(size = 3) +
   geom_errorbar(aes(ymin = lwr, ymax = upr), width = 0.15) +
@@ -161,33 +173,7 @@ project.direction.plot <- ggplot(ep, aes(x = reorder(project, mean), y = mean)) 
   )
 project.direction.plot
 
-# ### --- time 
-# nd_time <- expand_grid(
-#   project = unique(centroids.traj.dir$project),
-#   t01_proj = seq(0, 1, length.out = 100)) %>%
-#   filter(project != "VCR")
-# 
-# pred_time <- fitted(
-#   m1,
-#   newdata = nd_time,
-#   re_formula = NA,
-#   summary = TRUE) %>%
-#   as_tibble() %>%
-#   bind_cols(nd_time)
-# 
-# ggplot(pred_time,
-#        aes(x = t01_proj, y = Estimate, colour = project)) +
-#   geom_line() +
-#   scale_fill_viridis_d() +
-#   scale_color_viridis_d() +
-#   geom_ribbon(aes(ymin = Q2.5, ymax = Q97.5, fill = project),
-#               alpha = 0.15, colour = NA) +
-#   theme_minimal(base_size = 14) +
-#   labs(x = "Relative time (0–1)",
-#        y = "Predicted axis_ratio",
-#        title = "Axis dominance through time by project")
-# 
-
+### prepare for rosette plots
 centroids.dir.abs <- centroids.traj.dir %>%
   mutate(adPC1 = abs(dPC1), adPC2 = abs(dPC2)) 
 
@@ -207,19 +193,8 @@ rosette.plots.project <- ggplot(angle.data, aes(angle_wrapped, fill = project)) 
   )
 rosette.plots.project
 
-centroid.tests <- centroids.traj %>%
-  filter(!is.na(angle)) %>%
-  group_by(system) %>%
-  summarise(
-    p = circular::rayleigh.test(circular(angle))$p.value,
-    mean_dir = as.numeric(mean(circular(angle))),
-    .groups = "drop"
-  ) %>%
-  arrange(p) %>%
-  left_join(comm.meta)
-centroid.tests
 
-
+### different way to visualize it
 centroid.traj.dir <- centroids.traj %>%
   filter(!is.na(dPC1)) %>%
   pivot_longer(cols = c(dPC1, dPC2),
@@ -237,6 +212,7 @@ centroid.traj.plot <- ggplot(centroid.traj.dir, aes(axis, abs(delta), fill = pro
 centroid.traj.plot
 
 
+### look at step lengths -- not very interesting
 step_lengths_time <- centroids.traj %>%
   filter(!is.na(step_length)) %>%
   ggplot(aes(year, step_length, colour = project)) +
@@ -256,7 +232,7 @@ step_lengths_time
 
 
 # define global grid breaks
-nbins <- 40  # adjust: 20–40 is usually fine
+nbins <- 20  # adjust: 20–40 is usually fine
 
 pc1_breaks <- seq(min(traitsxcomms$PC1), max(traitsxcomms$PC1), length.out = nbins + 1)
 pc2_breaks <- seq(min(traitsxcomms$PC2), max(traitsxcomms$PC2), length.out = nbins + 1)
