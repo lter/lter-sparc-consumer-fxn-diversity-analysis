@@ -42,13 +42,13 @@ These are probably Fig 1/SI figures showing how most traits are uncorrelated (an
 
 
 +++++++
-SCRIPT: 3-Fnal_space_and_FD_through_time_CM.r
+SCRIPT: 3_Get_sp_coord_and_funct_dist.r
 INPUT: "transformed_data/sp_tr_zscore.rds"
 
 This script takes the z-score transformed traits, removes duplicates across projects
 (so they don't count twice in trait space), and performs a PCoA.
-Species PCoA scores are extracted to 
-OUTPUT: "transformed_data/sp_faxes_coord.rds"
+Species PCoA scores and functional distances (based on traits - not in the PCoA space) are extracted to 
+OUTPUT: "transformed_data/sp_faxes_coord.rds" and "trandformed_data/funct_dist_matrix.rds"
 
 
 

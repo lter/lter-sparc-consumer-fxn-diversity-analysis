@@ -28,9 +28,99 @@ rm(list = ls()); gc()
 # 1 - Get species coordinates in the functional space ==========================
 
 
+# Load species coord in the space:
+sp_faxes_coord_df <- readRDS(file.path("transformed_data",
+                                  "sp_faxes_coord.rds"))
+
+# Load trait-based distances between species (not in the fnal space):
+sp_dist_df <- readRDS(file.path("transformed_data",
+                                "funct_dist_matrix.rds"))
+
+# Load functional space details:
+fspaces_quality <- readRDS(file.path("transformed_data",
+                                     "fspaces_details.rds"))
+
 # Load our studied traits:
 sp_tr_zscore <- readRDS(file.path("transformed_data",
                   "sp_tr_zscore.rds"))
+
+# Subset it to tr and fish/birds for now:
+sp_tr_df <- sp_tr_zscore %>% 
+  dplyr::filter(taxon %in% c("Birds", "Fish")) %>% 
+  dplyr::select(c("scientific_name",
+                  "tr.mass.adult.zt",
+                  "tr.trophic.level.zt",
+                  "tr.reproduction.unified.zt",
+                  "tr.age.zt")) %>% 
+  dplyr::distinct() %>% 
+  dplyr::ungroup() 
+
+# One species has two names: Zonotrichia leucophyrs, arbitrarily chose the first
+# TO FIX
+sp_tr_df2 <- sp_tr_df %>% 
+  dplyr::filter(scientific_name != "Zonotrichia leucophyrs") %>% 
+  tibble::column_to_rownames(var = "scientific_name") %>% 
+  dplyr::select(-c("taxon"))
+
+#### NOTE: STILL HAVE TO RUN FUNCT DIST AND FCT SP TO GET FCT SP DETAILS #######
+#### MAKE SURE THAT YOU HAVE THE LAST UP TO DATE TR AND COORD ##################
+
+# Build a dataframe gathering traits categories:
+tr_nm <- colnames(sp_tr_df2)
+tr_cat <- c("Q", "Q", "Q","Q")
+tr_cat_df <- as.data.frame(matrix(ncol = 2, nrow = 4))
+tr_cat_df[, 1] <- tr_nm
+tr_cat_df[, 2] <- tr_cat
+colnames(tr_cat_df) <- c("trait_name", "trait_type")
+
+
+# Build functional distances (used gower as NAs):
+sp_dist_df <- mFD::funct.dist(
+  sp_tr         = sp_tr_df2,
+  tr_cat        = tr_cat_df,
+  metric        = "gower",
+  scale_euclid  = "noscale",
+  ordinal_var   = "classic",
+  weight_type   = "equal",
+  stop_if_NA    = FALSE)
+
+# Get functional space quality and sp coord:
+fspaces_quality <- mFD::quality.fspaces(
+  sp_dist             = sp_dist_df,
+  maxdim_pcoa         = 10,
+  deviation_weighting = "absolute",
+  fdist_scaling       = FALSE,
+  fdendro             = "average")
+
+# Check that 3D space still ok:
+mFD::quality.fspaces.plot(
+  fspaces_quality            = fspaces_quality,
+  quality_metric             = "mad",
+  fspaces_plot               = c("tree_average", "pcoa_2d", "pcoa_3d", 
+                                 "pcoa_4d", "pcoa_5d", "pcoa_6d"),
+  name_file                  = NULL,
+  range_dist                 = NULL,
+  range_dev                  = NULL,
+  range_qdev                 = NULL,
+  gradient_deviation         = c(neg = "darkblue", nul = "grey80", pos = "darkred"),
+  gradient_deviation_quality = c(low = "yellow", high = "red"),
+  x_lab                      = "Trait-based distance")
+
+# Check correlation traits and axes:
+tr_faxes <- mFD::traits.faxes.cor(
+  sp_tr          = sp_tr_df2, 
+  sp_faxes_coord = sp_faxes_coord_df[ , c("PC1", "PC2", "PC3")], 
+  stop_if_NA = FALSE,
+  plot = TRUE)
+tr_faxes
+
+sp_faxes_coord_df <- fspaces_quality$"details_fspaces"$"sp_pc_coord"
+
+
+
+# Load our studied traits:
+sp_tr_zscore <- readRDS(file.path("transformed_data",
+                                  "sp_tr_zscore.rds"))
 
 # Subset it to tr and fish/birds for now:
 sp_tr_df <- sp_tr_zscore %>% 
@@ -77,32 +167,6 @@ fspaces_quality <- mFD::quality.fspaces(
   fdist_scaling       = FALSE,
   fdendro             = "average")
 
-# Check that 3D space still ok:
-mFD::quality.fspaces.plot(
-  fspaces_quality            = fspaces_quality,
-  quality_metric             = "mad",
-  fspaces_plot               = c("tree_average", "pcoa_2d", "pcoa_3d", 
-                                 "pcoa_4d", "pcoa_5d", "pcoa_6d"),
-  name_file                  = NULL,
-  range_dist                 = NULL,
-  range_dev                  = NULL,
-  range_qdev                 = NULL,
-  gradient_deviation         = c(neg = "darkblue", nul = "grey80", pos = "darkred"),
-  gradient_deviation_quality = c(low = "yellow", high = "red"),
-  x_lab                      = "Trait-based distance")
-
-sp_faxes_coord_df <- fspaces_quality$"details_fspaces"$"sp_pc_coord"
-saveRDS(sp_faxes_coord_df, 
-        file.path("transformed_data",
-                  "sp_faxes_coord.rds"))
-
-# Check correlation traits and axes:
-tr_faxes <- mFD::traits.faxes.cor(
-  sp_tr          = sp_tr_df2, 
-  sp_faxes_coord = sp_faxes_coord_df[ , c("PC1", "PC2", "PC3")], 
-  stop_if_NA = FALSE,
-  plot = TRUE)
-tr_faxes
 
 # 2 - Plot functional space with arrows ========================================
 
@@ -148,17 +212,17 @@ sp_faxes_coord_df2 <- as.data.frame(sp_faxes_coord_df) %>%
   dplyr::filter(taxon %in% c("Fish", "Birds")) %>% 
   dplyr::distinct() %>% 
   tibble::column_to_rownames(var = "scientific_name")
- 
+
 ## Do PC1-PC2 plot: 
 plot_pcoa_12 <- ggplot2::ggplot() +
   ggplot2::geom_point(sp_faxes_coord_df2, 
                       mapping = ggplot2::aes(x = PC1, y = PC2,
-                                                       color = taxon),
+                                             color = taxon),
                       alpha = 0.6) +
   ggplot2::scale_color_manual(values = c("#C9A227", "#1B9E77")) +
   ggplot2::theme(legend.position = "none") +
   ggplot2::theme_bw() 
-  
+
 plot_pcoa_12
 
 # Now let's add the arrows
@@ -174,15 +238,15 @@ std_cov2 <- as.data.frame(std_cov) %>%
 
 plot_pcoa_12 <- plot_pcoa_12 +
   ggplot2::geom_segment(data = as.data.frame(std_cov2),
-               x = 0, y = 0, alpha = 0.7,
-               mapping = ggplot2::aes(xend = PC1, yend = PC2),
-               arrow = arrow(length = unit(3, "mm"))) +
+                        x = 0, y = 0, alpha = 0.7,
+                        mapping = ggplot2::aes(xend = PC1, yend = PC2),
+                        arrow = arrow(length = unit(3, "mm"))) +
   ggrepel::geom_text_repel(data = std_cov2,
-                  aes(x = PC1, y = PC2, label = tr_nm),
-                  size = 4,
-                  nudge_x = 0.01, nudge_y = 0.01) +
+                           aes(x = PC1, y = PC2, label = tr_nm),
+                           size = 4,
+                           nudge_x = 0.01, nudge_y = 0.01) +
   ggplot2::theme(legend.position = "none") 
-  
+
 plot_pcoa_12
 
 # Add species silhouettes?
@@ -234,14 +298,26 @@ sp_dist_all_df <- mFD::dist.to.df(list("dist" = sp_dist_df))
 fish_sp_list <- sp_tr_df$scientific_name[which(sp_tr_df$taxon == "Fish")]
 birds_sp_list <- sp_tr_df$scientific_name[which(sp_tr_df$taxon == "Birds")]
 
+
 # Build df to keep the uniqueness of each species (based on fish or bird pool):
 funiq_fish_df <- as.data.frame(matrix(ncol = 3, nrow = length(fish_sp_list), NA))
-colnames(funiq_df) <- c("scientific_name", "FUni_score", "Taxa")
-funiq_df$scientific_name <- unique(sp_tr_df$scientific_name)
-funiq_df
+colnames(funiq_fish_df) <- c("scientific_name", "FUni_score", "Taxa")
+funiq_fish_df$scientific_name <- fish_sp_list
+funiq_fish_df$Taxa <- rep("Fish", nrow(funiq_fish_df))
+
+# Build a distance df with fish species:
+# Remove all birds-birds pairs
+sp_dist_fish_df <- sp_dist_all_df[which(sp_dist_all_df$x1 %in% fish_sp_list |
+                                          sp_dist_all_df$x2 %in% fish_sp_list), ]
+# Keep only fish-fish pairs:
+for (i in c(1:nrow(sp_dist_fish_df))) {
+  
+}
 
 
 #### STOPPED HERE
+
+
 
 
 # 3 - Build the assemblage dataframe ===========================================
@@ -253,10 +329,8 @@ funiq_df
 comm_df <- read.csv(file.path("Data",
                               "community_tidy-data",
                               "04_harmonized_consumer_excretion_sparc_cnd_site.csv"))
-sp_comm_df <- read.csv(file.path("transformed_data",
-                              "Mack_data.csv")) #system
-saveRDS(sp_comm_df,
-        file.path("transformed_data", "Macks_data.rds"))
+sp_comm_df <- readRDS(file.path("transformed_data",
+                                 "Mack_data.rds")) #system
 
 # Call species list:
 # sp_list <- readRDS(file.path("transformed_data",
@@ -264,7 +338,7 @@ saveRDS(sp_comm_df,
 
 # Link comm and species list:
 #sp_comm_df <- dplyr::left_join(comm_df, dplyr::distinct(sp_list[, c(4,12)]),
-                               #by = "scientific_name")
+#by = "scientific_name")
 sp_comm_df2 <- sp_comm_df %>% 
   dplyr::select(c("project", "habitat", "system", "year", "scientific_name")) 
 
@@ -279,8 +353,8 @@ fish_asb_df <- sp_comm_df2 %>%
   dplyr::distinct() %>% # because several subsites inside each "site"
   dplyr::mutate(presence = 1) %>%
   tidyr::pivot_wider(names_from = scientific_name,
-              values_from = presence,
-              values_fill = 0)
+                     values_from = presence,
+                     values_fill = 0)
 
 # Then add all the other species used to build functional space:
 # Get species used to build the functional space but not in fish asb:
@@ -288,8 +362,8 @@ other_sp <- setdiff(rownames(sp_faxes_coord_df),
                     colnames(fish_asb_df)[-1])
 # Add these new species:
 missing_sp_mat <- matrix(0,
-                        nrow = nrow(fish_asb_df),
-                        ncol = length(other_sp))
+                         nrow = nrow(fish_asb_df),
+                         ncol = length(other_sp))
 colnames(missing_sp_mat) <- other_sp
 
 all_asb_temp_df <- cbind(fish_asb_df,
@@ -364,8 +438,8 @@ results_df_Coastal <- results_df %>%
   dplyr::filter(project %in% c("COASTAL_CEN", "COASTAL_SOUTH"))
 
 fric_plot_Coastal <- ggplot2::ggplot(data = results_df_Coastal,
-                             ggplot2::aes(x = year, y = fric,
-                                          colour = project)) +
+                                     ggplot2::aes(x = year, y = fric,
+                                                  colour = project)) +
   ggplot2::geom_point(alpha = 0.6) +
   ggplot2::geom_smooth(method = "loess", se = TRUE) +
   ggplot2::facet_wrap(~ system, scales = "free_y") +
@@ -377,7 +451,7 @@ fric_plot_Coastal
 results_df_CoastalCEN <- results_df %>% 
   dplyr::filter(project %in% c("COASTAL_CEN"))
 fric_plot_CoastalCEN <- ggplot2::ggplot(data = results_df_CoastalCEN,
-                                     ggplot2::aes(x = year, y = fric)) +
+                                        ggplot2::aes(x = year, y = fric)) +
   ggplot2::geom_point(alpha = 0.6) +
   ggplot2::geom_smooth(method = "loess", se = TRUE) +
   ggplot2::facet_wrap(~ system, scales = "free_y") +
@@ -389,7 +463,7 @@ results_df_CoastalCEN_fide1 <- results_df %>%
   dplyr::filter(project %in% c("COASTAL_CEN"))
 
 fide1_plot_CoastalCEN <- ggplot2::ggplot(data = results_df_CoastalCEN,
-                                        ggplot2::aes(x = year, y = fide_PC1)) +
+                                         ggplot2::aes(x = year, y = fide_PC1)) +
   ggplot2::geom_point(alpha = 0.6) +
   ggplot2::geom_smooth(method = "loess", se = TRUE) +
   ggplot2::facet_wrap(~ system, scales = "free_y") +
@@ -420,7 +494,7 @@ results_df_FCE <- results_df %>%
   dplyr::filter(project %in% c("FCE"))
 
 fric_plot_FCE <- ggplot2::ggplot(data = results_df_FCE,
-                                        ggplot2::aes(x = year, y = fric)) +
+                                 ggplot2::aes(x = year, y = fric)) +
   ggplot2::geom_point(alpha = 0.6) +
   ggplot2::geom_smooth(method = "loess", se = TRUE) +
   ggplot2::facet_wrap(~ system, scales = "free_y") +
@@ -429,7 +503,7 @@ fric_plot_FCE <- ggplot2::ggplot(data = results_df_FCE,
 fric_plot_FCE
 
 fide1_plot_FCE <- ggplot2::ggplot(data = results_df_FCE,
-                                         ggplot2::aes(x = year, y = fide_PC1)) +
+                                  ggplot2::aes(x = year, y = fide_PC1)) +
   ggplot2::geom_point(alpha = 0.6) +
   ggplot2::geom_smooth(method = "loess", se = TRUE) +
   ggplot2::facet_wrap(~ system, scales = "free_y") +
@@ -438,7 +512,7 @@ fide1_plot_FCE <- ggplot2::ggplot(data = results_df_FCE,
 fide1_plot_FCE
 
 fide2_plot_FCE <- ggplot2::ggplot(data = results_df_FCE,
-                                         ggplot2::aes(x = year, y = fide_PC2)) +
+                                  ggplot2::aes(x = year, y = fide_PC2)) +
   ggplot2::geom_point(alpha = 0.6) +
   ggplot2::geom_smooth(method = "loess", se = TRUE) +
   ggplot2::facet_wrap(~ system, scales = "free_y") +
