@@ -16,7 +16,7 @@
 `%>%` <- magrittr::`%>%`
 
 # Load libraries
-librarian::shelf(tidyverse, dplyr, funbiogeo, ggplot2)
+librarian::shelf(tidyverse, dplyr, funbiogeo, ggplot2, mFD, ape)
 
 # Get set up
 source("00_setup.R")
@@ -32,9 +32,9 @@ rm(list = ls()); gc()
 sp_tr_zscore <- readRDS(file.path("transformed_data",
                   "sp_tr_zscore.rds"))
 
-# Subset it to tr and fish/birds/mammals/amphibians for now:
+# Subset it to tr and fish/birds for now:
 sp_tr_df <- sp_tr_zscore %>% 
-  dplyr::filter(taxa %in% c("Birds", "Fish")) %>% 
+  dplyr::filter(taxon %in% c("Birds", "Fish")) %>% 
   dplyr::select(c("scientific_name",
                   "tr.mass.adult.zt",
                   "tr.trophic.level.zt",
@@ -46,9 +46,9 @@ sp_tr_df <- sp_tr_zscore %>%
 # One species has two names: Zonotrichia leucophyrs, arbitrarily chose the first
 # TO FIX
 sp_tr_df2 <- sp_tr_df %>% 
-  dplyr::filter(scientific_name != " Zonotrichia leucophyrs") %>% 
+  dplyr::filter(scientific_name != "Zonotrichia leucophyrs") %>% 
   tibble::column_to_rownames(var = "scientific_name") %>% 
-  dplyr::select(-c("taxa"))
+  dplyr::select(-c("taxon"))
 
 # Build a dataframe gathering traits categories:
 tr_nm <- colnames(sp_tr_df2)
@@ -104,6 +104,146 @@ tr_faxes <- mFD::traits.faxes.cor(
   plot = TRUE)
 tr_faxes
 
+# 2 - Plot functional space with arrows ========================================
+
+# Using Matthias Grenie functions: https://gist.github.com/Rekyt/ee15330639f8719d87aebdb8a5b095d4
+# Adapted to our data
+
+# Function 1 to add arrows - get covariance btw tr and faxes:
+trait_df <- sp_tr_df2 
+sp_coord <- sp_faxes_coord_df 
+pc_eigenvalues <- fspaces_quality$details_fspaces$pc_eigenvalues
+
+compute_arrows <- function(sp_coord, trait_df, pc_eigenvalues) {
+  
+  # Get nb of species
+  n <- nrow(trait_df)
+  points.stand <- scale(sp_faxes_coord_df)
+  
+  # Compute covariance of variables with all axes
+  S <- cov(trait_df, points.stand, use = "pairwise.complete.obs")
+  
+  # Select only positive eigenvalues
+  pos_eigen = pc_eigenvalues$Eigenvalues
+  
+  # Standardize value of covariance (see Legendre & Legendre 1998)
+  std_cov <- S %*% diag((pos_eigen/(n - 1))^(-0.5))
+  colnames(std_cov) <- colnames(sp_faxes_coord_df)
+  
+  return(std_cov)
+}
+
+std_cov <- compute_arrows(trait_df = sp_tr_df2,
+                          sp_coord = sp_faxes_coord_df, 
+                          pc_eigenvalues = fspaces_quality$details_fspaces$pc_eigenvalues)
+
+
+# Basic plot with individuals:
+# Add taxa colors:
+sp_faxes_coord_df2 <- as.data.frame(sp_faxes_coord_df) %>% 
+  tibble::rownames_to_column(var = "scientific_name") %>% 
+  dplyr::left_join(sp_tr_zscore[, c("scientific_name",
+                                    "taxon")],
+                   by = "scientific_name") %>%
+  dplyr::filter(taxon %in% c("Fish", "Birds")) %>% 
+  dplyr::distinct() %>% 
+  tibble::column_to_rownames(var = "scientific_name")
+ 
+## Do PC1-PC2 plot: 
+plot_pcoa_12 <- ggplot2::ggplot() +
+  ggplot2::geom_point(sp_faxes_coord_df2, 
+                      mapping = ggplot2::aes(x = PC1, y = PC2,
+                                                       color = taxon),
+                      alpha = 0.6) +
+  ggplot2::scale_color_manual(values = c("#C9A227", "#1B9E77")) +
+  ggplot2::theme(legend.position = "none") +
+  ggplot2::theme_bw() 
+  
+plot_pcoa_12
+
+# Now let's add the arrows
+# Each arrow begins at the origin of the plot (x = 0, y = 0) and ends at the
+# values of covariances of each variable
+std_cov2 <- as.data.frame(std_cov) %>% 
+  tibble::rownames_to_column(var = "traits") %>%
+  dplyr::mutate(
+    PC1 = PC1 / 20,
+    PC2 = PC2 / 20) %>% 
+  dplyr::mutate(tr_nm = c("Body Mass", "Trophic Level", "Reproduction",
+                          "Life Span"))
+
+plot_pcoa_12 <- plot_pcoa_12 +
+  ggplot2::geom_segment(data = as.data.frame(std_cov2),
+               x = 0, y = 0, alpha = 0.7,
+               mapping = ggplot2::aes(xend = PC1, yend = PC2),
+               arrow = arrow(length = unit(3, "mm"))) +
+  ggrepel::geom_text_repel(data = std_cov2,
+                  aes(x = PC1, y = PC2, label = tr_nm),
+                  size = 4,
+                  nudge_x = 0.01, nudge_y = 0.01) +
+  ggplot2::theme(legend.position = "none") 
+  
+plot_pcoa_12
+
+# Add species silhouettes?
+
+
+## Do PC2-PC3 plot: 
+plot_pcoa_23 <- ggplot2::ggplot() +
+  ggplot2::geom_point(sp_faxes_coord_df2, 
+                      mapping = ggplot2::aes(x = PC2, y = PC3,
+                                             color = taxon),
+                      alpha = 0.6) +
+  ggplot2::scale_color_manual(values = c("#C9A227", "#1B9E77")) +
+  ggplot2::theme_bw() 
+
+plot_pcoa_23
+
+# Now let's add the arrows
+# Each arrow begins at the origin of the plot (x = 0, y = 0) and ends at the
+# values of covariances of each variable
+std_cov3 <- as.data.frame(std_cov) %>% 
+  tibble::rownames_to_column(var = "traits") %>%
+  dplyr::mutate(
+    PC2 = PC2 / 100,
+    PC3 = PC3 / 100) %>% 
+  dplyr::mutate(tr_nm = c("Body Mass", "Trophic Level", "Reproduction",
+                          "Life Span"))
+
+plot_pcoa_23 <- plot_pcoa_23 +
+  ggplot2::geom_segment(data = as.data.frame(std_cov3),
+                        x = 0, y = 0, alpha = 0.7,
+                        mapping = ggplot2::aes(xend = PC2, yend = PC3),
+                        arrow = arrow(length = unit(3, "mm"))) +
+  ggrepel::geom_text_repel(data = std_cov3,
+                           aes(x = PC2, y = PC3, label = tr_nm),
+                           size = 4,
+                           nudge_x = 0.01, nudge_y = 0.01)
+plot_pcoa_23
+
+# Add them together:
+plot_fnal_space <- plot_pcoa_12 + plot_pcoa_23
+plot_fnal_space
+
+# 3 - Compute species uniqueness TO DO ===============================================
+
+
+# Get functional distance between species:¨
+sp_dist_all_df <- mFD::dist.to.df(list("dist" = sp_dist_df))
+
+fish_sp_list <- sp_tr_df$scientific_name[which(sp_tr_df$taxon == "Fish")]
+birds_sp_list <- sp_tr_df$scientific_name[which(sp_tr_df$taxon == "Birds")]
+
+# Build df to keep the uniqueness of each species (based on fish or bird pool):
+funiq_fish_df <- as.data.frame(matrix(ncol = 3, nrow = length(fish_sp_list), NA))
+colnames(funiq_df) <- c("scientific_name", "FUni_score", "Taxa")
+funiq_df$scientific_name <- unique(sp_tr_df$scientific_name)
+funiq_df
+
+
+#### STOPPED HERE
+
+
 # 3 - Build the assemblage dataframe ===========================================
 
 
@@ -115,6 +255,9 @@ comm_df <- read.csv(file.path("Data",
                               "04_harmonized_consumer_excretion_sparc_cnd_site.csv"))
 sp_comm_df <- read.csv(file.path("transformed_data",
                               "Mack_data.csv")) #system
+saveRDS(sp_comm_df,
+        file.path("transformed_data", "Macks_data.rds"))
+
 # Call species list:
 # sp_list <- readRDS(file.path("transformed_data",
 #                              "species_list_corrected_fish.rds"))
