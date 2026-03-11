@@ -30,7 +30,7 @@ rm(list = ls()); gc()
 
 # Load our studied traits:
 sp_tr_zscore <- readRDS(file.path("transformed_data",
-                  "sp_tr_zscore.rds"))
+                  "sp_tr_zscore_new.rds"))
 
 # Subset it to tr and fish/birds for now:
 sp_tr_df <- sp_tr_zscore %>% 
