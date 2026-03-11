@@ -30,11 +30,11 @@ rm(list = ls()); gc()
 
 
 # Call the new imputed data after download from Drive (ask Shalanda's ok):
-imp_tr_df <- read.csv(file.path("Data", "traits_tidy-data", "consumer-trait-species-imputed-taxonmic-database.csv"))
+imp_tr_df <- read.csv(file.path("Data", "traits_tidy-data", "consumer-trait-species-imputed-taxonmic-database-copy.csv"))
 
 
 # Call the sp dataset
-spp_master <- readr::read_csv(file.path("Data","species_tidy-data", "23_species_master-spp-list.csv")) |>
+spp_master <- readr::read_csv(file.path("Data","species_tidy-data", "23_species_master-spp-list-copy.csv")) |>
   janitor::clean_names()
 
 
@@ -204,7 +204,7 @@ sp_list_ready <- sp_list_v2 %>% distinct(sp.proj, .keep_all = T)
 
 # Save it:
 saveRDS(sp_list_ready,
-        file.path("transformed_data", "species_list_corrected_fish.rds"))
+        file.path("transformed_data", "species_list_corrected_fish_new.rds"))
 #--- end cleaning fish 
 
 
@@ -216,19 +216,19 @@ program_sp_trt_data <- dplyr::left_join(sp_list_ready, imp_tr_df,
     family = coalesce(family.x, family.y),
     genus = coalesce(genus.x, genus.y)) %>%
   dplyr::select(-ends_with(".x"), -ends_with(".y")) %>%
-  dplyr::relocate(order, family, genus, .before = sex) %>%
+  # dplyr::relocate(order, family, genus, .before = sex) %>%   # CM: No sex column now 11/03/2026
   dplyr::relocate(source, .before = scientific_name) 
 #some source info absent need to fix this later!!! 
 
-# 0 or negative lifespans are actually NAs
-program_sp_trt_data$age_life.span_years[which(program_sp_trt_data$age_life.span_years<=0)] <- NA
+# 0 or negative lifespans are actually NAs: 11/03/2026 there is no life span == 0 now
+# program_sp_trt_data$age_life.span_years[which(program_sp_trt_data$age_life.span_years<=0)] <- NA
 
 
 
 # Create a new column for Taxa:
 # program_sp_trt_data$taxa <- project.taxon$taxa[match(program_sp_trt_data$project, project.taxon$project)]
 
-### INFILL MISSING num.offspring.per.year (may be deprecated)
+### INFILL MISSING num.offspring.per.year (may be deprecated - CM: still used on 11/03/2026 it still adds data)
 # calculate reproduction where needed
 missing.offspring <- which(is.na(program_sp_trt_data$reproduction_reproductive.rate_num.offspring.per.year))
 program_sp_trt_data$reproduction_reproductive.rate_num.offspring.per.year[missing.offspring] <- program_sp_trt_data$reproduction_reproductive.rate_num.litter.or.clutch.per.year[missing.offspring] * program_sp_trt_data$reproduction_reproductive.rate_num.offspring.per.clutch.or.litter[missing.offspring] 
@@ -277,9 +277,9 @@ program_sp_trt_data$reproduction_reproductive.rate_num.offspring.per.year[missin
 # remove projects no longer in analysis:
 BAD <- c("KONZA","PIE","KBS_INS","MOHONK", "KBS_MAM", "KBS_BIR", "KBS_AMP")
 
-# rename and z-score standardize
+# rename and z-score standardize #CM: 11/03/26 no class column included
 all_traits <- program_sp_trt_data %>% filter(!project %in% BAD) %>%
-  dplyr::select(c("project","habitat","taxon", "scientific_name","kingdom","class","order","family","genus","sp.proj","source","raw_filename",
+  dplyr::select(c("project","habitat","taxon", "scientific_name","kingdom","order","family","genus","sp.proj","source","raw_filename",
                   "tr.age.years"="age_life.span_years",
                   "length_adult_cm",
                   "tr.trophic.level.num" = "diet_trophic.level_num",
@@ -447,7 +447,7 @@ for(i in 1:length(unique(all_traits$project))){
 ## 6 - Save cleaned trait data ===================
 saveRDS(all_traits,
         file.path("transformed_data",
-                  "sp_tr_zscore.rds"))
+                  "sp_tr_zscore_new.rds"))
 
 
 
