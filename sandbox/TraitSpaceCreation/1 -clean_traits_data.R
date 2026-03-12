@@ -226,7 +226,8 @@ program_sp_trt_data <- dplyr::left_join(sp_list_ready, imp_tr_df,
   dplyr::mutate(
     order = coalesce(order.x, order.y),
     family = coalesce(family.x, family.y),
-    genus = coalesce(genus.x, genus.y)) %>%
+    genus = coalesce(genus.x, genus.y),
+    class = coalesce(class.x, class.y)) %>%
   dplyr::select(-ends_with(".x"), -ends_with(".y")) %>%
   # dplyr::relocate(order, family, genus, .before = sex) %>%   # CM: No sex column now 11/03/2026
   dplyr::relocate(source, .before = scientific_name) 
@@ -291,7 +292,7 @@ BAD <- c("KONZA","PIE","KBS_INS","MOHONK", "KBS_MAM", "KBS_BIR", "KBS_AMP")
 
 # rename and z-score standardize #CM: 11/03/26 no class column included
 all_traits <- program_sp_trt_data %>% filter(!project %in% BAD) %>%
-  dplyr::select(c("project","habitat","taxon", "scientific_name","kingdom","order","family","genus","sp.proj","source","raw_filename",
+  dplyr::select(c("project","habitat","taxon", "scientific_name","kingdom","class", "order","family","genus","sp.proj","source","raw_filename",
                   "tr.age.years"="age_life.span_years",
                   "length_adult_cm",
                   "tr.trophic.level.num" = "diet_trophic.level_num",
