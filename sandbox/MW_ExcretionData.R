@@ -281,6 +281,7 @@ dt_cnd <- dt1 |>
 glimpse(dt_cnd)
 head(dt_cnd)
 nacheck(dt_cnd)
+write_csv(dt_cnd, '../../../../../../Downloads/mw_excretion_comm.csv')
 
 dt_cnd |> 
       mutate(project = as.factor(project)) |> 
