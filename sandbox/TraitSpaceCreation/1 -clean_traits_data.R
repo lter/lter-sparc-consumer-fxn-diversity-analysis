@@ -34,7 +34,7 @@ imp_tr_df <- read.csv(file.path("Data", "traits_tidy-data", "consumer-trait-spec
 
 
 # Call the sp dataset
-spp_master <- readr::read_csv(file.path("Data","species_tidy-data", "23_species_master-spp-list.csv")) |>
+spp_master <- readr::read_csv(file.path("Data","species_tidy-data", "23_species_master-spp-list-copy.csv")) |>
   janitor::clean_names()
 
 
