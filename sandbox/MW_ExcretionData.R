@@ -31,7 +31,7 @@ dt <- read.csv(file.path("Data/community_tidy-data/", "04_harmonized_consumer_ex
             subsite_level1 = ifelse(is.na(subsite_level1) | subsite_level1 == "", "not available", subsite_level1),
             subsite_level2 = ifelse(is.na(subsite_level2) | subsite_level2 == "", "not available", subsite_level2),
             subsite_level3 = ifelse(is.na(subsite_level3) | subsite_level3 == "", "not available", subsite_level3)
-            ) |> 
+      ) |> 
       
       # filter out projects we are using at this point
       filter(project %in% c('MCR', 'CoastalCA', 'SBC', 'VCR', 'FCE',
@@ -52,52 +52,10 @@ dt <- read.csv(file.path("Data/community_tidy-data/", "04_harmonized_consumer_ex
       filter(
             !(project == "FCE" & site == "TB" & subsite_level1 == "5"),
             !(project == "FCE" & site == "RB" & subsite_level1 %in% c("17", "19"))
-      )
-
-glimpse(dt)
-nacheck(dt)
-
-### add phylum where necessary and update excretion values for those taxa
-dta <- dt |> filter(!is.na(phylum))
-dtb1 <- dt |> filter(is.na(phylum), density_num_m2 == 0) |> 
-      mutate(phylum = 'Chordata')
-dtb2 <- dt |> filter(is.na(phylum), density_num_m2 > 0) |> 
-      mutate(phylum = 'Chordata') |> 
-      mutate(n_vert_coef = if_else(phylum == "Chordata", 0.7804, 0),
-             n_diet_coef = if_else(diet_cat == "algae_detritus", -0.0389,
-                                   if_else(diet_cat == "invert", -0.2013,
-                                           if_else(diet_cat == "fish", -0.0537,
-                                                   if_else(diet_cat == "fish_invert", -0.1732, 
-                                                           if_else(diet_cat == "algae_invert", 0,
-                                                                   NA))))),
-             nexc_log10  = ifelse(dmperind_g_ind > 0, 1.461 + 0.6840*(log10(dmperind_g_ind)) + 0.0246*temp_c + n_diet_coef + n_vert_coef,NA),
-             nind_ug_hr  = 10^nexc_log10,
-             nind_ug_hr  = ifelse(is.na(nind_ug_hr),0,nind_ug_hr)) |> 
-      mutate(p_vert_coef = if_else(phylum == "Chordata", 0.7504, 0),
-             p_diet_coef = if_else(diet_cat == "algae_detritus", 0.0173,
-                                   if_else(diet_cat == "invert", -0.2480,
-                                           if_else(diet_cat == "fish", -0.0337,
-                                                   if_else(diet_cat == "fish_invert", -0.4525, 
-                                                           if_else(diet_cat == "algae_invert",0,
-                                                                   NA))))),
-             pexc_log10  = ifelse(dmperind_g_ind >0, 0.6757 + 0.5656*(log10(dmperind_g_ind)) + 0.0194*temp_c + p_diet_coef + p_vert_coef, NA),
-             pind_ug_hr  = 10^pexc_log10,
-             pind_ug_hr  = ifelse(is.na(pind_ug_hr),0,pind_ug_hr)) |> 
-      select(-n_vert_coef, -n_diet_coef, -nexc_log10, 
-             -p_vert_coef, -p_diet_coef, -pexc_log10)
-dtb <- rbind(dtb1, dtb2)
-dt_ab <- rbind(dta, dtb)      
-
-dt1 <- dt_ab |>
+      ) |> 
       
-      # filter out organisms that are not fish
-      mutate(
-            order = case_when(
-                  is.na(order) ~ 'missing',
-                  TRUE ~ order
-            )) |>
-      filter(phylum == 'Chordata',
-             order != 'Decapoda') |> 
+      # remove weird phylum stuff for right now - fix later :)
+      filter(phylum!="") |> 
       
       # set upper end for California Moray eel based on reported maximum weight
       mutate(
@@ -106,23 +64,7 @@ dt1 <- dt_ab |>
                   TRUE ~ dmperind_g_ind
             )) |> 
       
-      # remove extraordinary large schools of fish [lost < 0.0001 % of data]
-      # FCE doesn't catch thousands of fish per transect, so fine for this given variable area measurements (i.e., electrofishing program)
-      mutate(
-            area = case_when(
-                  project == 'CoastalCA' ~ 60,
-                  project == 'SBC' ~ 80,
-                  project == 'VCR' ~ 25,
-                  project == 'MCR' & subsite_level3 == '1' ~ 50,
-                  project == 'MCR' & subsite_level3 == '5' ~ 250,
-                  TRUE ~ NA_real_
-            ),
-            count = area*density_num_m2
-      ) |> 
-      filter(project == "FCE" | count <10000) |> 
-      select(-area, -count) |> 
-      
-      # remove 'biomass buster' sharks and rays from CoastalCA, SBC, and MCR [lost < 0.01% of data]
+      # remove 'biomass buster' sharks and rays from CoastalCA, SBC, and MCR [lost ~ 0.01% of data]
       group_by(project, habitat) |> 
       mutate(
             mean_dmperind = mean(dmperind_g_ind, na.rm = TRUE),
@@ -130,23 +72,18 @@ dt1 <- dt_ab |>
             lower_bound   = mean_dmperind - 5 * sd_dmperind,  
             upper_bound   = mean_dmperind + 5 * sd_dmperind,
             outlier       = dmperind_g_ind < lower_bound | dmperind_g_ind > upper_bound,
-            sharkray      = grepl("\\bshark\\b|\\bray\\b", common_name, ignore.case = TRUE),
+            # sharkray      = grepl("\\bshark\\b|\\bray\\b", common_name, ignore.case = TRUE), # common name not carried forward in CFD
             elasmo        = class %in% c("Chondrichthyes", "Elasmobranchii")
       ) |> 
       ungroup() |> 
-      filter(!(outlier & (sharkray | elasmo))) |> 
-      select(-mean_dmperind, -sd_dmperind, -lower_bound, -upper_bound, -outlier, -sharkray, -elasmo) |> 
+      filter(!(outlier & (elasmo))) |> 
+      select(-mean_dmperind, -sd_dmperind, -lower_bound, -upper_bound, -outlier, -elasmo) |> 
       
       # coalesce density columns and remove unnecessary '..m3' column
-      mutate(density = coalesce(density_num_m, density_num_m2)) |> 
-      select(-density_num_m, -density_num_m2, -density_num_m3) |> 
-      
-      # remove high density of large-bodied fish observations that skew entire time series [lost < 0.01% of data]
-      filter(!(density > 1 & nind_ug_hr > 20000))
-glimpse(dt1)
-nacheck(dt1)
-head(dt1)
-rm(dt, dta, dtb1, dtb2, dtb, dt_ab)
+      mutate(density_num = coalesce(density_num_m, density_num_m2, density_num_m3)) |> 
+      select(-density_num_m, -density_num_m2, -density_num_m3)
+glimpse(dt)
+nacheck(dt)
 
 ##################################################################################################
 ##################################################################################################
@@ -179,9 +116,9 @@ dt2_mcr <- dt1 |>
                site, subsite_level1, subsite_level2, subsite_level3, 
                scientific_name) |> 
       summarize(
-            n       = sum(nind_ug_hr*density, na.rm = TRUE),
-            bm      = sum(dmperind_g_ind*density, na.rm = TRUE),
-            dens    = sum(density, na.rm = TRUE),
+            n       = sum(nind_ug_hr*density_num, na.rm = TRUE),
+            bm      = sum(dmperind_g_ind*density_num, na.rm = TRUE),
+            dens    = sum(density_num, na.rm = TRUE),
             .groups = 'drop'
       ) |> 
       group_by(project, habitat, year, month, 
@@ -212,9 +149,9 @@ dt2_other <- dt1 |>
       ### sum across unique taxa at the transect level
       ### coalesces multiple species observation to single n and bm value for each transect
       summarize(
-            species_n    = sum(nind_ug_hr*density, na.rm = TRUE),
-            species_bm   = sum(dmperind_g_ind*density, na.rm = TRUE),
-            species_dens = sum(density, na.rm = TRUE),
+            species_n    = sum(nind_ug_hr*density_num, na.rm = TRUE),
+            species_bm   = sum(dmperind_g_ind*density_num, na.rm = TRUE),
+            species_dens = sum(density_num, na.rm = TRUE),
             .groups = 'drop'
       ) |> 
       select(project, habitat, year, month, site, subsite_level1, subsite_level2, subsite_level3,
