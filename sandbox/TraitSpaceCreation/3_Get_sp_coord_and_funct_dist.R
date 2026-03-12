@@ -43,12 +43,22 @@ sp_tr_df <- sp_tr_zscore %>%
   dplyr::distinct() %>% 
   dplyr::ungroup() 
 
-# One species has two names: Zonotrichia leucophyrs, arbitrarily chose the first
+# Only keep one value per species (whatever the project):
+sp_tr_df1 <- sp_tr_df %>% 
+  dplyr::group_by(scientific_name) %>%
+  dplyr::summarise(across(where(is.numeric), ~ mean(.x, na.rm = TRUE)),
+            .groups = "drop") %>% 
+  dplyr::mutate(across(where(is.numeric), ~ ifelse(is.nan(.x), NA, .x)))
+
+# Count the proportion of NAs:
+na_prop <- sp_tr_df1 %>%
+  dplyr::summarise(across(where(is.numeric), ~ mean(is.na(.))))
+
+# One species has two names: Zonotrichia leucophyrs, chose the one with values:
 # TO FIX
-sp_tr_df2 <- sp_tr_df %>% 
-  dplyr::filter(scientific_name != "Zonotrichia leucophyrs") %>% 
-  tibble::column_to_rownames(var = "scientific_name") %>% 
-  dplyr::select(-c("taxon"))
+sp_tr_df2 <- sp_tr_df1 %>% 
+  dplyr::filter(scientific_name != "Zonotrichia leucophrys") %>% 
+  tibble::column_to_rownames(var = "scientific_name")
 
 # Build a dataframe gathering traits categories:
 tr_nm <- colnames(sp_tr_df2)
@@ -68,6 +78,9 @@ sp_dist_df <- mFD::funct.dist(
   ordinal_var   = "classic",
   weight_type   = "equal",
   stop_if_NA    = FALSE)
+
+# Check the species pairs which have a functional distance == 0:
+sp_dist <- mFD::dist.to.df(list("dist" = sp_dist_df))
 
 # Get functional space quality and sp coord:
 fspaces_quality <- mFD::quality.fspaces(
@@ -105,12 +118,12 @@ sp_faxes_coord_df <- fspaces_quality$"details_fspaces"$"sp_pc_coord"
 # Save functional distance matrix:
 saveRDS(sp_dist_df,
         file.path("transformed_data",
-                  "funct_dist_matrix.rds"))
+                  "funct_dist_matrix_new.rds"))
 
 # Save species coordinates:
 saveRDS(sp_faxes_coord_df, 
         file.path("transformed_data",
-                  "sp_faxes_coord.rds"))
+                  "sp_faxes_coord_new.rds"))
 
 
 

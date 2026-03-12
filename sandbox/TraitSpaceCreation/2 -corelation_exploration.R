@@ -27,9 +27,7 @@ rm(list = ls()); gc()
 # 1 - Load data =================================================================
 # Be sure to pull uodated .rds if running after data has been updated
 
-sp_tr_zscore <- readRDS(
-  "~/lter-sparc-consumer-fxn-diversity-analysis/transformed_data/sp_tr_zscore.rds"
-)
+sp_tr_zscore <- readRDS(file.path("transformed_data", "sp_tr_zscore_new.rds"))
 
 # 2 - Helpers ===================================================================
 
