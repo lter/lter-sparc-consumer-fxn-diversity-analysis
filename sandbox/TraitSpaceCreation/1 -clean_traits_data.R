@@ -34,7 +34,7 @@ imp_tr_df <- read.csv(file.path("Data", "traits_tidy-data", "consumer-trait-spec
 
 
 # Call the sp dataset
-spp_master <- readr::read_csv(file.path("Data","species_tidy-data", "23_species_master-spp-list-copy.csv")) |>
+spp_master <- readr::read_csv(file.path("Data","species_tidy-data", "23_species_master-spp-list.csv")) |>
   janitor::clean_names()
 
 
@@ -58,7 +58,7 @@ mammal_classes <- c("Mammalia")
 amphib_classes <- c("Amphibia")
 
 fish_classes <- c(
-  "Actinopterygii", "Teleostei",
+  "Actinopterygii", "Actinopteri", "Teleostei",
   "Chondrichthyes", "Elasmobranchii", "Holocephali",
   "Chondrostei", "Holostei",
   "Myxini", "Petromyzonti"
@@ -97,7 +97,8 @@ proj_allowed <- list(
   "NorthLakes"  = c("Zooplankton"),
   "FISHGLOB"    = c("Fish"),
   "FCE"         = c("Fish"),
-  "SBC"         = c("Fish", "Birds"),
+  "SBC"         = c("Fish"),
+  "SBC_BEACH"   = c("Birds"),
   "CoastalCA"   = c("Fish", "other_invertebrates"),
   "MCR"         = c("Fish"),
   "NGA"         = c("Zooplankton"),
@@ -108,11 +109,19 @@ proj_allowed <- list(
   "KBS_MAM"     = c("Mammals"),
   "HARVARD"     = c("Birds"),
   "SEV"         = c("Mammals"),
-  "MOHONK"      = c("Birds", "Mammals"),
+  "MOHONK_BIR"  = c("Birds"),
   "KONZA"       = c("Insects", "Mammals"),
   "PIE"         = c("Fish"),
   "RLS"         = c("Fish"),
-  "SBC_BEACH"   = c('Birds')
+  "AndrewsForest"  = c("Birds"),
+  "Luquillo"  = c("Birds"),
+  "HubbardBrook"  = c("Birds"),
+  "CAP"  = c("Birds"),
+  "SONGS" = c("Birds"),
+  "Baltimore" = c("Birds"),
+  "CCE_birds" = c("Birds"),
+  "PLUM" = c("Birds")
+  
 )
 
 dt1 <- dt |>
@@ -130,17 +139,20 @@ removed <- anti_join(dt, dt1)
 glimpse(removed)
 
 
-# add back in projects that had NA classes but were clean to begin with
+# add back in projects that had NA classes but were clean to begin with (focused only on birds, zoop, fish when checking)
 acceptable <- removed |> 
-  filter(project %in% c('KBS_AMP', 'KBS_BIR', 'KBS_MAM', 'HARVARD',
-                        'KONZA', 'SEV')) |> 
+  filter(project %in% c('KBS_AMP', 'KBS_BIR', 'HARVARD',
+                        'KONZA', 'SEV', 'PALMER',
+                      'CoastalCA', "MOHONK_BIR")) |> 
   mutate(taxon = case_when(
     project == 'KBS_AMP' ~ "Amphibians",
     project == 'KBS_BIR' ~ "Birds",
-    project == 'KBS_MAM' ~ "Mammals",
     project == 'HARVARD' ~ "Birds",
     project == 'KONZA' ~ "Insects",
     project == 'SEV' ~ "Mammals",
+    project == 'PALMER' ~ "Zooplankton",
+    project == 'CoastalCA' ~ "Fish",
+    project == 'MOHONK_BIR' ~ "Birds",
     TRUE ~ NA_character_
   ))
 
@@ -220,7 +232,7 @@ program_sp_trt_data <- dplyr::left_join(sp_list_ready, imp_tr_df,
   dplyr::relocate(source, .before = scientific_name) 
 #some source info absent need to fix this later!!! 
 
-# 0 or negative lifespans are actually NAs: 11/03/2026 there is no life span == 0 now
+# 0 or negative lifespans are actually NAs: CM there is no life span == 0 now
 # program_sp_trt_data$age_life.span_years[which(program_sp_trt_data$age_life.span_years<=0)] <- NA
 
 
