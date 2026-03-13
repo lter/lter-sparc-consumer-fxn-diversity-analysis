@@ -305,7 +305,7 @@ all_traits <- program_sp_trt_data %>% filter(!project %in% BAD) %>%
   dplyr::mutate(reproduction_fecundity_num = if_else(reproduction_fecundity_num < 0, 
                                                      NA, reproduction_fecundity_num)) %>% 
   dplyr::mutate(tr.reproduction.unified = case_when(
-    taxon %in% c("Fish", "Zooplnakton") ~ reproduction_fecundity_num,
+    taxon %in% c("Fish", "Zooplankton") ~ reproduction_fecundity_num,
     taxon %in% c("Birds","Mammals", "Amphibians") ~ reproduction_reproductive.rate_num.offspring.per.year,
     T ~ NA
   )) %>% 
