@@ -1,6 +1,6 @@
 ###project: LTER Consumer Functional Diversity
 ###author(s): MW
-###goal(s): Wrangling and summarizing raw CND data such that it is ready for CFD analysis
+###goal(s): 
 ###date(s): Spring 2026
 ###note(s): 
 
@@ -9,7 +9,8 @@
 # install.packages("librarian")
 librarian::shelf(tidyverse, vegan, readxl, splitstackshape, codyn, lavaan,
                  MuMIn, corrplot, performance, ggeffects, ggpubr, parameters, ggstats,
-                 brms, mixedup, rstatix, sf, ggspatial, waldo, multcompView, tidySEM)
+                 brms, mixedup, rstatix, sf, ggspatial, waldo, multcompView, tidySEM, skimr,
+                 GGally, lme4, lmerTest)
 
 ### set custom functions
 nacheck <- function(df) {
@@ -276,12 +277,16 @@ dt_cnd <- dt1 |>
             comm_dens = mean(comm_dens, na.rm = TRUE),
             .groups   = 'drop'
       ) |> 
-      rename(site = site_site)
+      rename(site = site_site) |> 
+      filter(!project %in% c('RLSM', 'RLSN', 'RLSR')) |> 
+      
+      # removing from data only for the link with community-weighted means since everything appears to be zero
+      filter(!project %in% c('NGA', 'CCE'))
 
 glimpse(dt_cnd)
 head(dt_cnd)
 nacheck(dt_cnd)
-write_csv(dt_cnd, '../../../../../../Downloads/mw_excretion_comm.csv')
+# write_csv(dt_cnd, '../../../../../../Downloads/mw_excretion_comm.csv')
 
 dt_cnd |> 
       mutate(project = as.factor(project)) |> 
@@ -312,3 +317,161 @@ dt_cnd |>
             plot.title = element_text(size = 16, face = "bold", colour = "black",
                                       hjust = 0.5)
       )
+
+# community-weighted means ------------------------------------------------
+t <- read_csv('../../../../../../Downloads/consumer-trait-species-imputed-taxonmic-database.csv') |> 
+      dplyr::select(order, class, family, genus, scientific_name, 
+                    age_life.span_years, 
+                    age_maturity.female_years, age_maturity.male_years, age_maturity.max_years, age_maturity.min_years, age_maturity_years,
+                    diet_trophic.level_num, diet_trophic.level_ordinal, 
+                    length_adult.female.max_cm , length_adult.male.max_cm, length_adult.max_cm, length_adult.max_cm, length_max_cm,
+                    mass_adult_g, 
+                    reproduction_fecundity.max, reproduction_fecundity.min_num, reproduction_fecundity_num) |> 
+      distinct()
+
+t1 <- dt1 |> left_join(t) |> ### left join many-to-many... goes from 1886192 to 2150094 observations
+      dplyr::select(
+            project, habitat, site, subsite_level1, subsite_level2, subsite_level3, 
+            year, month, 
+            scientific_name, species_n, species_bm, species_dens, 
+            age_life.span_years, age_maturity_years, 
+            diet_trophic.level_num, 
+            length_adult.max_cm
+      ) |> 
+      distinct() ### repititive columns in here somewhere... goes from 2150094 to 2139747 observations
+glimpse(t1)
+
+missing_data_test <- t1 |>
+      dplyr::select(project, scientific_name, age_life.span_years, age_maturity_years, diet_trophic.level_num, length_adult.max_cm) |>
+      distinct() |>                                        
+      pivot_longer(
+            cols = c(age_life.span_years:length_adult.max_cm),
+            names_to = "trait",
+            values_to = "value"
+      ) |>
+      group_by(project, trait) |>
+      summarise(
+            n_total    = n(),
+            n_missing  = sum(is.na(value)),
+            n_present  = sum(!is.na(value)),
+            pct_missing = round(100 * n_missing / n_total, 2)
+      ) |>
+      ungroup() |>
+      arrange(trait, desc(pct_missing)) |> 
+      filter(!project %in% c('RLS', 'NGA', 'CCE')) |> 
+      group_by(trait) |> 
+      summarize(avg_pct_missing = mean(pct_missing, na.rm = TRUE),
+                .groups = 'drop')
+glimpse(missing_data_test)
+
+cwm <- t1 |>
+      group_by(project, habitat, site, subsite_level1, subsite_level2, subsite_level3, year, month) |>
+      mutate(
+            weight                 = species_bm / sum(species_bm, na.rm = TRUE)
+      ) |>
+      summarise(
+            cwm_age_lifespan       = sum(weight * age_life.span_years,    na.rm = TRUE),
+            cwm_age_maturity       = sum(weight * age_maturity_years,     na.rm = TRUE),
+            cwm_trophic_level      = sum(weight * diet_trophic.level_num, na.rm = TRUE),
+            cwm_length             = sum(weight * length_adult.max_cm,    na.rm = TRUE),
+            
+            # track how much of the community's biomass had trait data
+            coverage_age_lifespan  = sum(species_bm[!is.na(age_life.span_years)],    na.rm = TRUE) / sum(species_bm, na.rm = TRUE),
+            coverage_age_maturity  = sum(species_bm[!is.na(age_maturity_years)],     na.rm = TRUE) / sum(species_bm, na.rm = TRUE),
+            coverage_trophic       = sum(species_bm[!is.na(diet_trophic.level_num)], na.rm = TRUE) / sum(species_bm, na.rm = TRUE),
+            coverage_length        = sum(species_bm[!is.na(length_adult.max_cm)],    na.rm = TRUE) / sum(species_bm, na.rm = TRUE),
+            
+            n_species              = n_distinct(scientific_name),
+            .groups                = "drop"
+      ) |> 
+      
+      # remove nga and cce, as they have no trait coverage it would appear, as well as RLS since suspect numbers 
+      filter(!project %in% c('RLS', 'NGA', 'CCE')) |> 
+      
+      # filter instances where greater than 50% of trait data was missing
+      mutate(
+            cwm_age_lifespan       = if_else(coverage_age_lifespan < 0.5, NA_real_, cwm_age_lifespan),
+            cwm_age_maturity       = if_else(coverage_age_maturity < 0.5, NA_real_, cwm_age_maturity),
+            cwm_trophic_level      = if_else(coverage_trophic      < 0.5, NA_real_, cwm_trophic_level),
+            cwm_length             = if_else(coverage_length       < 0.5, NA_real_, cwm_length)
+      ) |> 
+      
+      mutate(project = case_when(
+            project  == 'CoastalCA' & site == 'CENTRAL'   ~ 'PCCC',
+            project  == 'CoastalCA' & site == 'SOUTH'     ~ 'PCCS',
+            TRUE ~ project
+      )) |> 
+      ### take everything to the true 'site' level in which transects should be
+      ### averaged across
+      mutate(
+            site_site = case_when(
+                  project == 'SBC'  ~ site,
+                  project == 'FCE'  ~ paste(site, subsite_level1, sep = ''),
+                  project == 'VCR'  ~ paste(site, subsite_level1, sep = ''),
+                  project == 'MCR'  ~ paste(subsite_level1, site, sep = ''),
+                  project == 'PCCC' ~ subsite_level2,
+                  project == 'PCCS' ~ subsite_level2
+            ) 
+      ) |> 
+      group_by(project, site_site, year) |> 
+      summarize(
+            cwm_lifespan      = mean(cwm_age_lifespan, na.rm = TRUE),
+            cwm_maturity      = mean(cwm_age_maturity, na.rm = TRUE),
+            cwm_trophic_level = mean(cwm_trophic_level, na.rm = TRUE),
+            cwm_length        = mean(cwm_length, na.rm = TRUE),
+            .groups   = 'drop'
+      ) |> 
+      rename(site = site_site)
+
+glimpse(cwm)
+glimpse(dt_cnd)
+
+model_data_all <- dt_cnd |> left_join(cwm)
+glimpse(model_data_all)
+
+model_data_all |>
+      pivot_longer(cols = starts_with("cwm_"), names_to = "trait", values_to = "value") |>
+      mutate(trait = str_remove(trait, "cwm_")) |> 
+      ggplot(aes(x = year, y = value, group = site)) +
+      geom_line(alpha = 0.6, linewidth = 0.2, color = 'grey') +
+      geom_smooth(aes(group = project), color = "black", se = FALSE, linewidth = 1) +
+      facet_grid(trait ~ project, scales = "free_y") +
+      theme_minimal() +
+      theme(legend.position = "none") +
+      labs(title = "Community-weighted mean traits over time", x = NULL, y = NULL)
+
+model_data_all |>
+      pivot_longer(cols = c(comm_n, comm_bm, comm_dens), names_to = "metric", values_to = "value") |> 
+      ggplot(aes(x = year, y = value, group = site)) +
+      geom_line(alpha = 0.6, linewidth = 0.2, color = 'grey') +
+      geom_smooth(aes(group = project), color = "black", se = FALSE, linewidth = 1) +
+      facet_grid(metric ~ project, scales = "free_y") +
+      theme_minimal() +
+      theme(legend.position = "none") +
+      labs(title = "Community-level function over time", x = NULL, y = NULL)
+
+model_data_all |>
+      dplyr::select(project, comm_n, comm_bm, 
+                    cwm_lifespan, cwm_maturity, cwm_trophic_level, cwm_length) |>
+      ggpairs(aes(color = project, alpha = 0.4),
+              columns = 2:7) +
+      theme_minimal()
+glimpse(model_data_all)
+
+model_data_scaled <- model_data_all |>
+      mutate(across(c(comm_n, cwm_lifespan, cwm_maturity, cwm_trophic_level, cwm_length), scale))
+
+model_data_scaled |>
+      dplyr::select(comm_n, cwm_lifespan, 
+                    cwm_maturity, cwm_trophic_level, cwm_length) |>
+      cor(use = "pairwise.complete.obs") |>
+      corrplot(method = "ellipse", 
+               type = "upper",
+               addCoef.col = "black",
+               number.cex = 0.7,
+               tl.col = "black")
+
+m1 <- lmer(comm_n ~ cwm_lifespan + cwm_maturity + cwm_trophic_level + cwm_length +
+                 (1 | project/site) + (1 | year),
+           data = model_data_scaled)
+summary(m1)
