@@ -134,5 +134,14 @@ test <- dt |> filter(project == 'FCE') |>
                   scientific_name == 'Sciaenops ocellatus'     ~ 'fisheries',
                   TRUE ~ 'other'
             )
-      )
-
+      ) |> 
+      mutate(
+            site = paste(site, subsite_level1, sep = ""),
+            transect = paste('B', subsite_level2, sep = ""),
+            site_transect = paste(site, transect, sep = " ")
+      ) |> 
+      dplyr::select(year, month,
+                    site, transect, site_transect,
+                    family, genus, scientific_name, diet_cat, fisheries_species,
+                    dmperind_g_ind, nind_ug_hr, density = density_num)
+write_csv(test, '../../../../../../Downloads/fce-fish-community-function.csv')
