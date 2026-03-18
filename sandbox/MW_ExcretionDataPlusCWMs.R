@@ -440,7 +440,7 @@ model_data_all |>
       coord_cartesian(ylim = c(-4, 4)) + 
       theme_minimal() +
       theme(legend.position = "none") +
-      labs(title = "Community-weighted mean traits over time", x = NULL, y = NULL)
+      labs(x = NULL, y = NULL)
 
 model_data_all |>
       mutate(across(comm_n:cwm_length, ~as.numeric(scale(.x)))) |> 
