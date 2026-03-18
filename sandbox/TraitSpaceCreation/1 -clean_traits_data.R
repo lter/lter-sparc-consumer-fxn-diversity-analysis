@@ -163,7 +163,7 @@ sp_list <- rbind(dt1, acceptable)
 
 # 3 - final random cleaning =========================
 
-#### dropping/averaging duplicate imp_tr_df
+######## TRAITS: dropping/averaging duplicate imp_tr_df ######
 # MANY species have multiple entries
 # 22489 have >1 entry in imp_tr_df
 # CURRENTLY: 
