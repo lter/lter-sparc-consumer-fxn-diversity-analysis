@@ -163,9 +163,13 @@ sp_list <- rbind(dt1, acceptable)
 
 # 3 - final random cleaning =========================
 
-#### dropping duplicate imp_tr_df
+#### dropping/averaging duplicate imp_tr_df
 # MANY species have multiple entries
 # 22489 have >1 entry in imp_tr_df
+# CURRENTLY: 
+# - if multiple trait values for the same scientific_name, this averages them
+# - if multiple taxonomic values for same scientific_name, used the first alphabetically
+# - turned "" into NAs in taxonomic data
 
 # function to return numeric values if they exist or NA if none:
 mean_na_safe <- function(x) {
