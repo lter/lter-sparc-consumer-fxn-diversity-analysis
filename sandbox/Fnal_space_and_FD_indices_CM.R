@@ -4,7 +4,7 @@
 ##
 ## Camille Magneville
 ##
-## 02/2026
+## 02/2026 - 03/2026
 ##
 ################################################################################
 
@@ -30,40 +30,41 @@ rm(list = ls()); gc()
 
 # Load species coord in the space:
 sp_faxes_coord_df <- readRDS(file.path("transformed_data",
-                                  "sp_faxes_coord.rds"))
+                                  "sp_faxes_coord_new_complete.rds"))
 
 # Load trait-based distances between species (not in the fnal space):
 sp_dist_df <- readRDS(file.path("transformed_data",
-                                "funct_dist_matrix.rds"))
-
-# Load functional space details:
-fspaces_quality <- readRDS(file.path("transformed_data",
-                                     "fspaces_details.rds"))
+                                "funct_dist_matrix_new_complete.rds"))
 
 # Load our studied traits:
+sp_tr_zscore_complete <- readRDS(file.path("transformed_data",
+                  "sp_tr_zscore_new_complete.rds"))
 sp_tr_zscore <- readRDS(file.path("transformed_data",
-                  "sp_tr_zscore.rds"))
+                                           "sp_tr_zscore_new.rds"))
 
 # Subset it to tr and fish/birds for now:
-sp_tr_df <- sp_tr_zscore %>% 
-  dplyr::filter(taxon %in% c("Birds", "Fish")) %>% 
-  dplyr::select(c("scientific_name",
-                  "tr.mass.adult.zt",
-                  "tr.trophic.level.zt",
-                  "tr.reproduction.unified.zt",
-                  "tr.age.zt")) %>% 
-  dplyr::distinct() %>% 
-  dplyr::ungroup() 
+# sp_tr_df <- sp_tr_zscore %>% 
+#   dplyr::filter(taxon %in% c("Birds", "Fish")) %>% 
+#   dplyr::select(c("scientific_name",
+#                   "tr.mass.adult.zt",
+#                   "tr.trophic.level.zt",
+#                   "tr.reproduction.unified.zt",
+#                   "tr.age.zt")) %>% 
+#   dplyr::distinct() %>% 
+#   dplyr::ungroup() 
 
 # One species has two names: Zonotrichia leucophyrs, arbitrarily chose the first
 # TO FIX
-sp_tr_df2 <- sp_tr_df %>% 
-  dplyr::filter(scientific_name != "Zonotrichia leucophyrs") %>% 
-  tibble::column_to_rownames(var = "scientific_name") %>% 
-  dplyr::select(-c("taxon"))
+# sp_tr_df2 <- sp_tr_df %>% 
+#   dplyr::filter(scientific_name != "Zonotrichia leucophyrs") %>% 
+#   tibble::column_to_rownames(var = "scientific_name") %>% 
+#   dplyr::select(-c("taxon"))
 
 #### NOTE: STILL HAVE TO RUN FUNCT DIST AND FCT SP TO GET FCT SP DETAILS #######
 #### MAKE SURE THAT YOU HAVE THE LAST UP TO DATE TR AND COORD ##################
+
+# To remove when normal workflow comes back:
+sp_tr_df2 <- sp_tr_zscore_complete
 
 # Build a dataframe gathering traits categories:
 tr_nm <- colnames(sp_tr_df2)
@@ -115,57 +116,6 @@ tr_faxes <- mFD::traits.faxes.cor(
 tr_faxes
 
 sp_faxes_coord_df <- fspaces_quality$"details_fspaces"$"sp_pc_coord"
-
-
-
-# Load our studied traits:
-sp_tr_zscore <- readRDS(file.path("transformed_data",
-                                  "sp_tr_zscore.rds"))
-
-# Subset it to tr and fish/birds for now:
-sp_tr_df <- sp_tr_zscore %>% 
-  dplyr::filter(taxon %in% c("Birds", "Fish")) %>% 
-  dplyr::select(c("scientific_name",
-                  "tr.mass.adult.zt",
-                  "tr.trophic.level.zt",
-                  "tr.reproduction.unified.zt",
-                  "tr.age.zt")) %>% 
-  dplyr::distinct() %>% 
-  dplyr::ungroup() 
-
-# One species has two names: Zonotrichia leucophyrs, arbitrarily chose the first
-# TO FIX
-sp_tr_df2 <- sp_tr_df %>% 
-  dplyr::filter(scientific_name != "Zonotrichia leucophyrs") %>% 
-  tibble::column_to_rownames(var = "scientific_name") %>% 
-  dplyr::select(-c("taxon"))
-
-# Build a dataframe gathering traits categories:
-tr_nm <- colnames(sp_tr_df2)
-tr_cat <- c("Q", "Q", "Q","Q")
-tr_cat_df <- as.data.frame(matrix(ncol = 2, nrow = 4))
-tr_cat_df[, 1] <- tr_nm
-tr_cat_df[, 2] <- tr_cat
-colnames(tr_cat_df) <- c("trait_name", "trait_type")
-
-
-# Build functional distances (used gower as NAs):
-sp_dist_df <- mFD::funct.dist(
-  sp_tr         = sp_tr_df2,
-  tr_cat        = tr_cat_df,
-  metric        = "gower",
-  scale_euclid  = "noscale",
-  ordinal_var   = "classic",
-  weight_type   = "equal",
-  stop_if_NA    = FALSE)
-
-# Get functional space quality and sp coord:
-fspaces_quality <- mFD::quality.fspaces(
-  sp_dist             = sp_dist_df,
-  maxdim_pcoa         = 10,
-  deviation_weighting = "absolute",
-  fdist_scaling       = FALSE,
-  fdendro             = "average")
 
 
 # 2 - Plot functional space with arrows ========================================
@@ -289,14 +239,15 @@ plot_pcoa_23
 plot_fnal_space <- plot_pcoa_12 + plot_pcoa_23
 plot_fnal_space
 
-# 3 - Compute species uniqueness TO DO ===============================================
+# 3 - Compute species uniqueness ===============================================
 
 
+## UNIQUENESS PER TAXA
 # Get functional distance between species:¨
 sp_dist_all_df <- mFD::dist.to.df(list("dist" = sp_dist_df))
 
-fish_sp_list <- sp_tr_df$scientific_name[which(sp_tr_df$taxon == "Fish")]
-birds_sp_list <- sp_tr_df$scientific_name[which(sp_tr_df$taxon == "Birds")]
+fish_sp_list <- rownames(sp_faxes_coord_df2[which(sp_faxes_coord_df2$taxon == "Fish"), ])
+birds_sp_list <- rownames(sp_faxes_coord_df2[which(sp_faxes_coord_df2$taxon == "Birds"), ])
 
 
 # Build df to keep the uniqueness of each species (based on fish or bird pool):
@@ -305,6 +256,12 @@ colnames(funiq_fish_df) <- c("scientific_name", "FUni_score", "Taxa")
 funiq_fish_df$scientific_name <- fish_sp_list
 funiq_fish_df$Taxa <- rep("Fish", nrow(funiq_fish_df))
 
+funiq_birds_df <- as.data.frame(matrix(ncol = 3, nrow = length(birds_sp_list), NA))
+colnames(funiq_birds_df) <- c("scientific_name", "FUni_score", "Taxa")
+funiq_birds_df$scientific_name <- birds_sp_list
+funiq_birds_df$Taxa <- rep("Birds", nrow(funiq_birds_df))
+
+
 # Build a distance df with fish species:
 # Remove all birds-birds pairs
 sp_dist_fish_df <- sp_dist_all_df[which(sp_dist_all_df$x1 %in% fish_sp_list |
@@ -312,15 +269,176 @@ sp_dist_fish_df <- sp_dist_all_df[which(sp_dist_all_df$x1 %in% fish_sp_list |
 # Keep only fish-fish pairs:
 for (i in c(1:nrow(sp_dist_fish_df))) {
   
+  sp1 <- sp_dist_fish_df$x1[i] 
+  sp2 <- sp_dist_fish_df$x2[i] 
+  
+  if (sp1 %in% birds_sp_list | sp2 %in% birds_sp_list) {
+   sp_dist_fish_df$x1[i] <- NA
+   sp_dist_fish_df$x2[i] <- NA
+    
+  }
+  
+}
+sp_dist_fish_df2 <- sp_dist_fish_df %>% 
+  dplyr::filter(!is.na(x1))
+
+
+# Build a distance df with birds species:
+# Remove all fish-fish pairs
+sp_dist_birds_df <- sp_dist_all_df[which(sp_dist_all_df$x1 %in% birds_sp_list |
+                                          sp_dist_all_df$x2 %in% birds_sp_list), ]
+# Keep only birds-birds pairs:
+for (i in c(1:nrow(sp_dist_birds_df))) {
+  
+  sp1 <- sp_dist_birds_df$x1[i] 
+  sp2 <- sp_dist_birds_df$x2[i] 
+  
+  if (sp1 %in% fish_sp_list | sp2 %in% fish_sp_list) {
+    sp_dist_birds_df$x1[i] <- NA
+    sp_dist_birds_df$x2[i] <- NA
+    
+  }
+  
+}
+sp_dist_birds_df2 <- sp_dist_birds_df %>% 
+  dplyr::filter(!is.na(x1))
+
+
+# Compute species uniqueness (std distances from 0 to 1 first):
+
+# Define a function to compute species uniqueness:
+compute.funiqueness <- function(sp_dist_df,
+                              funiq_df) {
+  
+  # Scale distances between 0 and 1 (Violle et al 2017):
+  sp_dist_df$dist <- sp_dist_df$dist/max(sp_dist_df$dist)
+  
+  for (sp_nm in funiq_df$scientific_name) {
+    
+    sp_dist_subset <- sp_dist_df[which(sp_dist_df$x1 == sp_nm |
+                                                 sp_dist_df$x2 == sp_nm), ]
+    sp_fdis_score <- sum(sp_dist_subset$dist) / (nrow(sp_dist_subset) - 1)
+    
+    funiq_df$FUni_score[which(funiq_df$scientific_name == sp_nm)] <- sp_fdis_score
+    
+  } 
+  
+  return(funiq_df)
+  
 }
 
+fish_funiq_df2 <- compute.funiqueness(sp_dist_df = sp_dist_fish_df2,
+                                      funiq_df = funiq_fish_df)
+birds_funiq_df2 <- compute.funiqueness(sp_dist_df = sp_dist_birds_df2,
+                                      funiq_df = funiq_birds_df)
 
-#### STOPPED HERE
+
+## UNIQUENESS ALL TAXA
+# Get functional distance between species:¨
+sp_dist_all_df <- mFD::dist.to.df(list("dist" = sp_dist_df))
+all_sp_list <- rownames(sp_faxes_coord_df2)
+
+
+# Build df to keep the uniqueness of each species:
+all_funiq_df <- as.data.frame(matrix(ncol = 3, nrow = length(all_sp_list), NA))
+colnames(all_funiq_df) <- c("scientific_name", "FUni_score", "Taxa")
+all_funiq_df$scientific_name <- all_sp_list
 
 
 
+# Compute species uniqueness (std distances from 0 to 1 first):
+all_funiq_df2 <- compute.funiqueness(sp_dist_df = sp_dist_all_df,
+                                      funiq_df = all_funiq_df)
 
-# 3 - Build the assemblage dataframe ===========================================
+
+# 3 - Plot functional uniqueness in the functional space =======================
+
+
+# Plot uniquenesss computed with all taxa together:
+
+sp_faxes_coord_df3 <- as.data.frame(sp_faxes_coord_df2) %>% 
+  tibble::rownames_to_column(var = "scientific_name") %>% 
+  dplyr::left_join(all_funiq_df2[, c("scientific_name",
+                                     "FUni_score")],
+                   by = "scientific_name") %>%
+  dplyr::distinct() %>% 
+  tibble::column_to_rownames(var = "scientific_name")
+
+
+plot_alluniq_12 <- ggplot2::ggplot() +
+  ggplot2::geom_point(sp_faxes_coord_df3, 
+                      mapping = ggplot2::aes(x = PC1, y = PC2,
+                                             color = FUni_score),
+                      alpha = 0.6) +
+  viridis::scale_color_viridis(option = "G") +
+  ggplot2::theme_bw()  +
+  ggplot2::theme(legend.position = "none") 
+plot_alluniq_23 <- ggplot2::ggplot() +
+  ggplot2::geom_point(sp_faxes_coord_df3, 
+                      mapping = ggplot2::aes(x = PC2, y = PC3,
+                                             color = FUni_score),
+                      alpha = 0.6) +
+  viridis::scale_color_viridis(option = "G") +
+  ggplot2::theme_bw() 
+# Add them together:
+plot_alluniq <- plot_alluniq_12 + plot_alluniq_23
+plot_alluniq
+
+
+# Plot uniquenesss birds and fish separated:
+
+fish_birds_funiq_df <- rbind(fish_funiq_df2, birds_funiq_df2)
+
+sp_faxes_coord_df4 <- as.data.frame(sp_faxes_coord_df2) %>% 
+  tibble::rownames_to_column(var = "scientific_name") %>% 
+  dplyr::left_join(fish_birds_funiq_df[, c("scientific_name",
+                                     "FUni_score")],
+                   by = "scientific_name") %>%
+  dplyr::distinct() %>% 
+  tibble::column_to_rownames(var = "scientific_name")
+
+
+plot_uniq_12 <- ggplot2::ggplot() +
+  ggplot2::geom_point(sp_faxes_coord_df4, 
+                      mapping = ggplot2::aes(x = PC1, y = PC2,
+                                             color = FUni_score),
+                      alpha = 0.6) +
+  viridis::scale_color_viridis(option = "G") +
+  ggplot2::theme_bw()  +
+  ggplot2::theme(legend.position = "none") 
+plot_uniq_23 <- ggplot2::ggplot() +
+  ggplot2::geom_point(sp_faxes_coord_df4, 
+                      mapping = ggplot2::aes(x = PC2, y = PC3,
+                                             color = FUni_score),
+                      alpha = 0.6) +
+  viridis::scale_color_viridis(option = "G") +
+  ggplot2::theme_bw() 
+# Add them together:
+plot_uniq <- plot_uniq_12 + plot_uniq_23
+plot_uniq
+
+
+# Compare uniqueness scores if based on species own taxon or all species:
+compare_funiq_df <- all_funiq_df2 %>% 
+  dplyr::left_join(fish_birds_funiq_df[, c("scientific_name", "FUni_score", "Taxa")],
+                   by = "scientific_name") %>% 
+  dplyr::rename(FUni_taxa_combined = "FUni_score.x",
+                FUni_per_taxa = "FUni_score.y") %>% 
+  dplyr::rename(Taxa = "Taxa.y") %>% 
+  dplyr::select(-c("Taxa.x"))
+
+plot_compare <- ggplot2::ggplot() +
+  ggplot2::geom_point(compare_funiq_df, 
+                      mapping = ggplot2::aes(x = FUni_taxa_combined, y = FUni_per_taxa,
+                                             color = Taxa),
+                      alpha = 0.6) +
+  ggplot2::scale_color_manual(values = c("#C9A227", "#1B9E77")) +
+  ggplot2::geom_abline() + 
+  ggplot2::theme_bw() 
+plot_compare
+
+
+# 4 - Build the assemblage dataframe ===========================================
 
 
 # Note: focus on the fish assemblages but still need all species in the asb df:

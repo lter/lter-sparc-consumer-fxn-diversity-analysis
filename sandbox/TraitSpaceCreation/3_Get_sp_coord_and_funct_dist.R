@@ -57,7 +57,7 @@ sp_tr_df12 <- sp_tr_df1 %>%
     !stringr::str_detect(scientific_name, "sp\\.?$"),
     stringr::str_detect(scientific_name, "^\\S+\\s+\\S+"))  # keep only strings with ≥2 words
 
-# Remove species which dn't have any trait values:
+# Remove species which don't have any trait values:
 sp_tr_df123 <- sp_tr_df12 %>% 
   dplyr::filter(!if_all(where(is.numeric), is.na))
 
