@@ -329,7 +329,7 @@ t <- read_csv('../../../../../../Downloads/consumer-trait-species-imputed-taxonm
                     reproduction_fecundity.max, reproduction_fecundity.min_num, reproduction_fecundity_num) |> 
       distinct()
 
-t1 <- dt1 |> left_join(t) |> ### left join many-to-many... goes from 1886192 to 2150094 observations
+t1 <- dt1 |> left_join(t) |> ### left join many-to-many... goes from 1886192 to 2148590 observations
       dplyr::select(
             project, habitat, site, subsite_level1, subsite_level2, subsite_level3, 
             year, month, 
@@ -338,7 +338,7 @@ t1 <- dt1 |> left_join(t) |> ### left join many-to-many... goes from 1886192 to 
             diet_trophic.level_num, 
             length_adult.max_cm
       ) |> 
-      distinct() ### repititive columns in here somewhere... goes from 2150094 to 2139747 observations
+      distinct() ### repetitive columns in here somewhere... goes from 2148590 to 2132442 observations
 glimpse(t1)
 
 missing_data_test <- t1 |>
@@ -426,52 +426,27 @@ cwm <- t1 |>
 glimpse(cwm)
 glimpse(dt_cnd)
 
-model_data_all <- dt_cnd |> left_join(cwm)
+model_data_all <- dt_cnd |> left_join(cwm) |> filter(project != 'VCR')
 glimpse(model_data_all)
 
 model_data_all |>
+      mutate(across(cwm_lifespan:cwm_length, ~as.numeric(scale(.x)))) |> 
       pivot_longer(cols = starts_with("cwm_"), names_to = "trait", values_to = "value") |>
       mutate(trait = str_remove(trait, "cwm_")) |> 
       ggplot(aes(x = year, y = value, group = site)) +
       geom_line(alpha = 0.6, linewidth = 0.2, color = 'grey') +
       geom_smooth(aes(group = project), color = "black", se = FALSE, linewidth = 1) +
-      facet_grid(trait ~ project, scales = "free_y") +
+      facet_grid(trait ~ project, scales = "free") +
+      coord_cartesian(ylim = c(-4, 4)) + 
       theme_minimal() +
       theme(legend.position = "none") +
       labs(title = "Community-weighted mean traits over time", x = NULL, y = NULL)
 
 model_data_all |>
-      pivot_longer(cols = c(comm_n, comm_bm, comm_dens), names_to = "metric", values_to = "value") |> 
-      ggplot(aes(x = year, y = value, group = site)) +
-      geom_line(alpha = 0.6, linewidth = 0.2, color = 'grey') +
-      geom_smooth(aes(group = project), color = "black", se = FALSE, linewidth = 1) +
-      facet_grid(metric ~ project, scales = "free_y") +
-      theme_minimal() +
-      theme(legend.position = "none") +
-      labs(title = "Community-level function over time", x = NULL, y = NULL)
-
-model_data_all |>
+      mutate(across(comm_n:cwm_length, ~as.numeric(scale(.x)))) |> 
       dplyr::select(project, comm_n, comm_bm, 
                     cwm_lifespan, cwm_maturity, cwm_trophic_level, cwm_length) |>
       ggpairs(aes(color = project, alpha = 0.4),
               columns = 2:7) +
       theme_minimal()
 glimpse(model_data_all)
-
-model_data_scaled <- model_data_all |>
-      mutate(across(c(comm_n, cwm_lifespan, cwm_maturity, cwm_trophic_level, cwm_length), scale))
-
-model_data_scaled |>
-      dplyr::select(comm_n, cwm_lifespan, 
-                    cwm_maturity, cwm_trophic_level, cwm_length) |>
-      cor(use = "pairwise.complete.obs") |>
-      corrplot(method = "ellipse", 
-               type = "upper",
-               addCoef.col = "black",
-               number.cex = 0.7,
-               tl.col = "black")
-
-m1 <- lmer(comm_n ~ cwm_lifespan + cwm_maturity + cwm_trophic_level + cwm_length +
-                 (1 | project/site) + (1 | year),
-           data = model_data_scaled)
-summary(m1)
