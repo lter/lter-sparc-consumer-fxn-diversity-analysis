@@ -163,6 +163,49 @@ sp_list <- rbind(dt1, acceptable)
 
 # 3 - final random cleaning =========================
 
+#### dropping duplicate imp_tr_df
+# MANY species have multiple entries
+# 22489 have >1 entry in imp_tr_df
+
+# function to return numeric values if they exist or NA if none:
+mean_na_safe <- function(x) {
+  if (all(is.na(x))) {
+    NA
+  } else {
+    mean(x, na.rm = TRUE)
+  }
+}
+paste_na_safe <- function(x) {
+  x <- unique(na.omit(x))
+  if (length(x) == 0) NA else paste(x, collapse = "; ")
+}
+grab_real <- function(x){
+  if(all(is.na(x))){
+    NA
+  } else {if(all(x=="")){
+    NA
+  } else{
+      unique(x)[which(nchar(unique(x))>1)][1]
+  }
+  }
+}
+
+
+empties <- imp_tr_df[which(imp_tr_df$scientific_name==""),]
+imp_tr_df_cl <- imp_tr_df[which(imp_tr_df$scientific_name!=""),] %>% group_by(scientific_name) %>% summarise(order = grab_real(order),
+                                                                      class=grab_real(class),
+                                                                      family=grab_real(family),
+                                                                      genus=grab_real(genus),
+                                                                      source=paste_na_safe(source),
+                                                                      age_life.span_years= mean_na_safe(age_life.span_years),
+                                                                      length_max_cm=mean_na_safe(length_max_cm),
+                                                                      diet_trophic.level_num = mean_na_safe(diet_trophic.level_num),
+                                                                      reproduction_reproductive.rate_num.offspring.per.year = mean_na_safe(reproduction_reproductive.rate_num.offspring.per.year),
+                                                                      reproduction_reproductive.rate_num.litter.or.clutch.per.year = mean_na_safe(reproduction_reproductive.rate_num.litter.or.clutch.per.year),
+                                                                      reproduction_reproductive.rate_num.offspring.per.clutch.or.litter = mean_na_safe(reproduction_reproductive.rate_num.offspring.per.clutch.or.litter),
+                                                                      reproduction_fecundity_num = mean_na_safe(reproduction_fecundity_num),
+                                                                      mass_adult_g = mean_na_safe(mass_adult_g))
+
 # change NAs to be blanks
 sp_list_v2 <- sp_list %>%
   dplyr::mutate(across(everything(), na_if, y = ""))
@@ -220,8 +263,11 @@ saveRDS(sp_list_ready,
 #--- end cleaning fish 
 
 
+
+
+
 #Join trait data with program species list 
-program_sp_trt_data <- dplyr::left_join(sp_list_ready, imp_tr_df,
+program_sp_trt_data <- dplyr::left_join(sp_list_ready, imp_tr_df_cl,
                                         by="scientific_name") %>%
   dplyr::mutate(
     order = coalesce(order.x, order.y),
@@ -526,7 +572,7 @@ for(i in 1:length(unique(all_traits$project))){
 ## 6 - Save cleaned trait data ===================
 saveRDS(all_traits,
         file.path("transformed_data",
-                  "sp_tr_zscore_new.rds"))
+                  "sp_tr_zscore_new_cleandups.rds"))
 
 
 
