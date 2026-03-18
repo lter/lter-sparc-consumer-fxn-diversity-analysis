@@ -574,10 +574,16 @@ for(i in 1:length(unique(all_traits$project))){
 
 
 ## 6 - Save cleaned trait data ===================
+# created new RDS without duplicates caused by many-to-one mapping with imputed traits -LDLA 3.18.26
+# currently produces df with 2797 rows
 saveRDS(all_traits,
         file.path("transformed_data",
                   "sp_tr_zscore_new_cleandups.rds"))
 
+# prior version from CM, produced df with 3490 rows
+# saveRDS(all_traits,
+#         file.path("transformed_data",
+#                   "sp_tr_zscore_new.rds"))
 
 
 
