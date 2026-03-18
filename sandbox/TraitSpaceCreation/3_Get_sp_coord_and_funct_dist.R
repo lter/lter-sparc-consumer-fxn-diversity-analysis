@@ -50,15 +50,34 @@ sp_tr_df1 <- sp_tr_df %>%
             .groups = "drop") %>% 
   dplyr::mutate(across(where(is.numeric), ~ ifelse(is.nan(.x), NA, .x)))
 
+# Remove the "species" which as "spp." -> Genus level don't have any information
+sp_tr_df12 <- sp_tr_df1 %>% 
+  dplyr::filter(
+    !stringr::str_detect(scientific_name, "spp\\.?$"), 
+    !stringr::str_detect(scientific_name, "sp\\.?$"),
+    stringr::str_detect(scientific_name, "^\\S+\\s+\\S+"))  # keep only strings with ≥2 words
+
+# Remove species which dn't have any trait values:
+sp_tr_df123 <- sp_tr_df12 %>% 
+  dplyr::filter(!if_all(where(is.numeric), is.na))
+
 # Count the proportion of NAs:
-na_prop <- sp_tr_df1 %>%
+na_prop <- sp_tr_df123 %>%
   dplyr::summarise(across(where(is.numeric), ~ mean(is.na(.))))
+
+# Restrict traits data to the one only with complete traits
+sp_tr_df123_complete <- sp_tr_df123 %>% 
+  dplyr::filter(if_all(where(is.numeric), ~ !is.na(.)))
 
 # One species has two names: Zonotrichia leucophyrs, chose the one with values:
 # TO FIX
-sp_tr_df2 <- sp_tr_df1 %>% 
+sp_tr_df2 <- sp_tr_df123_complete %>% 
   dplyr::filter(scientific_name != "Zonotrichia leucophrys") %>% 
   tibble::column_to_rownames(var = "scientific_name")
+
+# Temporarily save this df for later analyses:
+saveRDS(sp_tr_df2, file.path("transformed_data", "sp_tr_zscore_new_complete.rds"))
+
 
 # Build a dataframe gathering traits categories:
 tr_nm <- colnames(sp_tr_df2)
@@ -104,26 +123,27 @@ mFD::quality.fspaces.plot(
   gradient_deviation_quality = c(low = "yellow", high = "red"),
   x_lab                      = "Trait-based distance")
 
+sp_faxes_coord_df <- fspaces_quality$"details_fspaces"$"sp_pc_coord"
+
 # Check correlation traits and axes:
 tr_faxes <- mFD::traits.faxes.cor(
   sp_tr          = sp_tr_df2, 
-  sp_faxes_coord = sp_faxes_coord_df[ , c("PC1", "PC2", "PC3")], 
+  sp_faxes_coord = sp_faxes_coord_df[ , c("PC1", "PC2", "PC3", "PC4")], 
   stop_if_NA = FALSE,
   plot = TRUE)
 tr_faxes
 
-sp_faxes_coord_df <- fspaces_quality$"details_fspaces"$"sp_pc_coord"
 
 
 # Save functional distance matrix:
 saveRDS(sp_dist_df,
         file.path("transformed_data",
-                  "funct_dist_matrix_new.rds"))
+                  "funct_dist_matrix_new_complete.rds"))
 
 # Save species coordinates:
 saveRDS(sp_faxes_coord_df, 
         file.path("transformed_data",
-                  "sp_faxes_coord_new.rds"))
+                  "sp_faxes_coord_new_complete.rds"))
 
 
 
