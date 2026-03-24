@@ -189,16 +189,55 @@ sp_common <- names(xtabs(~scientific_name, sp_list_v3)[which(xtabs(~scientific_n
 
 
 BAD <- c("KONZA","PIE","KBS_INS","MOHONK", "KBS_MAM", "KBS_BIR", "KBS_AMP")
-sp_tr_df1 <- program_sp_trt_data %>% 
-  dplyr::select(c("project","habitat","taxon", "scientific_name","kingdom","class", "order","family","genus","sp.proj","source","raw_filename",
-                  "tr.age.years"="age_life.span_years",
-                  "length_max_cm",
-                  "tr.trophic.level.num" = "diet_trophic.level_num",
-                  "reproduction_reproductive.rate_num.offspring.per.year",
-                  "reproduction_fecundity_num",
-                  "tr.mass.adult.g" = "mass_adult_g")) %>% 
+sp_list_ready <- sp_list_unique %>% 
   dplyr::filter(taxon %in% c("Birds", "Zooplankton", "Fish")) %>% 
   dplyr::filter(!project %in% BAD)
+
+#### OLD taxon cleaning
+# ## add in a taxa column
+# 
+# # first make a taxon lookup table per project.
+# # we're gonna skip PIE (no traits)
+# # KBS_INS - insects
+# # KONZA - insects
+# project.taxon <- data.frame(project = unique(sp_list_ready$project))
+# project.taxon$taxa <- NA
+# project.taxon$taxa[which(project.taxon$project %in% c("NGA","Arctic","Palmer","CCE", "NorthLakes"))] <- "Zooplankton"
+# project.taxon$taxa[which(project.taxon$project %in% c("CoastalCA","FCE","SBC","MCR","VCR","RLS","FISHGLOB"))] <- "Fish"
+# project.taxon$taxa[which(project.taxon$project %in% c("KBS_MAM","SEV","MOHONK_MAM"))] <- "Mammals"
+# project.taxon$taxa[which(project.taxon$project %in% c("MOHONK_BIR","KBS_BIR","SBC_BEACH","HARVARD"))] <- "Birds"
+# project.taxon$taxa[which(project.taxon$project %in% c("KBS_AMP"))] <- "Amphibians"
+# project.taxon$taxa[which(project.taxon$project %in% c("KONZA","PIE","KBS_INS","MOHONK"))] <- "BAD"
+# # 
+# # project.taxon$kingdom <- NA
+# # project.taxon$kingdom[which(project.taxon$taxa)]
+# 
+# sp_list_ready$taxa <- project.taxon$taxa[match(sp_list_ready$project, project.taxon$project)]
+
+
+
+
+
+# #--- Clean Fish (may be deprecated if cleaned upstream in sp list)
+# # Get the classes of our Fish projects:
+# sp_list_fish_marine <- sp_list_ready %>% 
+#   dplyr::filter(project %in% c("CoastalCA","FCE","SBC","MCR","VCR","RLS","FISHGLOB"))
+# unique(sp_list_fish_marine$class)
+# 
+# # Keep: "Actinopterygii", "Teleostei", "Elasmobranchii", "Chondrichthyes"
+# sp_list_fish_marine_corrected <- sp_list_fish_marine %>% 
+#   dplyr::filter(class %in% c("Actinopterygii", "Teleostei", "Elasmobranchii", 
+#                                "Chondrichthyes"))
+#   
+# sp_list_ready_corrected <- sp_list_ready %>% 
+#   dplyr::filter(!project %in% c("CoastalCA","FCE","SBC","MCR","VCR","RLS","FISHGLOB")) %>% 
+#   dplyr::bind_rows(sp_list_fish_marine_corrected)
+
+# Save it:
+saveRDS(sp_list_ready,
+        file.path("transformed_data", "species_list_unique.rds"))
+#--- end species list cleaning
+
 
 
 # 3 - Traits Cleaning =========================
@@ -251,49 +290,7 @@ imp_tr_df_cl <- imp_tr_df[which(imp_tr_df$scientific_name!=""),] %>% group_by(sc
                                                                       mass_adult_g = mean_na_safe(mass_adult_g))
 
 
-# ## add in a taxa column
-# 
-# # first make a taxon lookup table per project.
-# # we're gonna skip PIE (no traits)
-# # KBS_INS - insects
-# # KONZA - insects
-# project.taxon <- data.frame(project = unique(sp_list_ready$project))
-# project.taxon$taxa <- NA
-# project.taxon$taxa[which(project.taxon$project %in% c("NGA","Arctic","Palmer","CCE", "NorthLakes"))] <- "Zooplankton"
-# project.taxon$taxa[which(project.taxon$project %in% c("CoastalCA","FCE","SBC","MCR","VCR","RLS","FISHGLOB"))] <- "Fish"
-# project.taxon$taxa[which(project.taxon$project %in% c("KBS_MAM","SEV","MOHONK_MAM"))] <- "Mammals"
-# project.taxon$taxa[which(project.taxon$project %in% c("MOHONK_BIR","KBS_BIR","SBC_BEACH","HARVARD"))] <- "Birds"
-# project.taxon$taxa[which(project.taxon$project %in% c("KBS_AMP"))] <- "Amphibians"
-# project.taxon$taxa[which(project.taxon$project %in% c("KONZA","PIE","KBS_INS","MOHONK"))] <- "BAD"
-# # 
-# # project.taxon$kingdom <- NA
-# # project.taxon$kingdom[which(project.taxon$taxa)]
-# 
-# sp_list_ready$taxa <- project.taxon$taxa[match(sp_list_ready$project, project.taxon$project)]
 
-
-
-
-
-# #--- Clean Fish (may be deprecated if cleaned upstream in sp list)
-# # Get the classes of our Fish projects:
-# sp_list_fish_marine <- sp_list_ready %>% 
-#   dplyr::filter(project %in% c("CoastalCA","FCE","SBC","MCR","VCR","RLS","FISHGLOB"))
-# unique(sp_list_fish_marine$class)
-# 
-# # Keep: "Actinopterygii", "Teleostei", "Elasmobranchii", "Chondrichthyes"
-# sp_list_fish_marine_corrected <- sp_list_fish_marine %>% 
-#   dplyr::filter(class %in% c("Actinopterygii", "Teleostei", "Elasmobranchii", 
-#                                "Chondrichthyes"))
-#   
-# sp_list_ready_corrected <- sp_list_ready %>% 
-#   dplyr::filter(!project %in% c("CoastalCA","FCE","SBC","MCR","VCR","RLS","FISHGLOB")) %>% 
-#   dplyr::bind_rows(sp_list_fish_marine_corrected)
-
-# Save it:
-saveRDS(sp_list_ready,
-        file.path("transformed_data", "species_list_corrected_fish_new.rds"))
-#--- end cleaning fish 
 
 
 
@@ -329,70 +326,62 @@ program_sp_trt_data$reproduction_reproductive.rate_num.offspring.per.year[missin
 
 ## ! TO REMOVE ONCE WE ARE USING THE UPDATED TRAITS DATA - START: Complete trophic levels: 
 # HAS TO BE DONE BEFORE TRAITS IMPUTATION BY TAXONOMY (but no other choice for meeting) CM.
+# as of 24 March 2026, seems that it's not infilling any traits.
+# so deprecated by LDLA
 
-BAD <- c("KONZA","PIE","KBS_INS","MOHONK", "KBS_MAM", "KBS_BIR", "KBS_AMP")
-sp_tr_df1 <- program_sp_trt_data %>% 
-  dplyr::select(c("project","habitat","taxon", "scientific_name","kingdom","class", "order","family","genus","sp.proj","source","raw_filename",
-                   "tr.age.years"="age_life.span_years",
-                   "length_max_cm",
-                   "tr.trophic.level.num" = "diet_trophic.level_num",
-                   "reproduction_reproductive.rate_num.offspring.per.year",
-                   "reproduction_fecundity_num",
-                   "tr.mass.adult.g" = "mass_adult_g")) %>% 
-  dplyr::filter(taxon %in% c("Birds", "Zooplankton", "Fish")) %>% 
-  dplyr::filter(!project %in% BAD)
-
-# Only keep fish species:
-sp_tr_fish <- sp_tr_df1 %>% 
-  dplyr::filter(taxon == "Fish") %>% 
-  dplyr::select(-c("project", "sp.proj")) %>% 
-  dplyr::distinct()
-
-# Count the proportion of NAs:
-na_prop_fish <- sp_tr_fish %>%
-  dplyr::summarise(across(where(is.numeric), ~ mean(is.na(.))))
-
-# Complete trophic levels:
-all_fish_sp_na <- sp_tr_fish$scientific_name[which(is.na(sp_tr_fish$tr.trophic.level.num))]
-fish_TL <- rfishbase::estimate(species_list = all_fish_sp_na,
-                               server = c("fishbase", "sealifebase"),
-                               version = "latest")
-
-sp_tr_fish_updated <- sp_tr_fish %>% 
-  dplyr::rename(Species = "scientific_name") %>% 
-  dplyr::left_join(fish_TL[, c("Species", "Troph", "AgeMax")]) %>% 
-  dplyr::rename(scientific_name = "Species")
-
-sp_tr_fish_updated2 <- sp_tr_fish_updated %>% 
-  dplyr::mutate(new.tr.trophic.level.num = dplyr::coalesce(tr.trophic.level.num, Troph),
-                new.tr.age.years = dplyr::coalesce(tr.age.years, AgeMax)) 
-
-# Look at the change in proportion of NAs:
-na_prop_fish_updated <- sp_tr_fish_updated2 %>%
-  dplyr::summarise(across(where(is.numeric), ~ mean(is.na(.))))
-
-# Take these new traits:
-sp_tr_fish_updated3 <- sp_tr_fish_updated2 %>% 
-  dplyr::select(-c("Troph", "AgeMax")) %>% 
-  dplyr::select(-c("tr.age.years", "tr.trophic.level.num")) %>% 
-  dplyr::rename(fish.tr.trophic.level.num = "new.tr.trophic.level.num",
-                fish.tr.age.years = "new.tr.age.years")
-
-# Update the species traits data:
-program_sp_trt_data2 <- program_sp_trt_data %>% 
-  dplyr::left_join(sp_tr_fish_updated3[, c("scientific_name",
-                                           "fish.tr.trophic.level.num",
-                                           "fish.tr.age.years")], by = "scientific_name") %>% 
-  dplyr::mutate(new.diet_trophic.level_num = dplyr::coalesce(diet_trophic.level_num, fish.tr.trophic.level.num),
-                new.age_life.span_years = dplyr::coalesce(age_life.span_years, fish.tr.age.years)) %>% 
-  dplyr::distinct()
+# sp_tr_df1 <- program_sp_trt_data 
+# 
+# # Only keep fish species:
+# sp_tr_fish <- sp_tr_df1 %>% 
+#   dplyr::filter(taxon == "Fish") %>% 
+#   dplyr::select(-c("project", "sp.proj")) %>% 
+#   dplyr::distinct()
+# 
+# # Count the proportion of NAs:
+# na_prop_fish <- sp_tr_fish %>%
+#   dplyr::summarise(across(where(is.numeric), ~ mean(is.na(.))))
+# 
+# # Complete trophic levels:
+# all_fish_sp_na <- sp_tr_fish$scientific_name[which(is.na(sp_tr_fish$tr.trophic.level.num))]
+# fish_TL <- rfishbase::estimate(species_list = all_fish_sp_na,
+#                                server = c("fishbase", "sealifebase"),
+#                                version = "latest")
+# 
+# sp_tr_fish_updated <- sp_tr_fish %>% 
+#   dplyr::rename(Species = "scientific_name") %>% 
+#   dplyr::left_join(fish_TL[, c("Species", "Troph", "AgeMax")]) %>% 
+#   dplyr::rename(scientific_name = "Species")
+# 
+# sp_tr_fish_updated2 <- sp_tr_fish_updated %>% 
+#   dplyr::mutate(new.diet_trophic.level_num = dplyr::coalesce(diet_trophic.level_num, Troph),
+#                 new.age_life.span_years = dplyr::coalesce(age_life.span_years, AgeMax)) 
+# 
+# # Look at the change in proportion of NAs:
+# na_prop_fish_updated <- sp_tr_fish_updated2 %>%
+#   dplyr::summarise(across(where(is.numeric), ~ mean(is.na(.))))
+# 
+# # Take these new traits:
+# sp_tr_fish_updated3 <- sp_tr_fish_updated2 %>% 
+#   dplyr::select(-c("Troph", "AgeMax")) %>% 
+#   dplyr::select(-c("tr.age.years", "tr.trophic.level.num")) %>% 
+#   dplyr::rename(fish.tr.trophic.level.num = "new.tr.trophic.level.num",
+#                 fish.tr.age.years = "new.tr.age.years")
+# 
+# # Update the species traits data:
+# program_sp_trt_data2 <- program_sp_trt_data %>% 
+#   dplyr::left_join(sp_tr_fish_updated3[, c("scientific_name",
+#                                            "fish.tr.trophic.level.num",
+#                                            "fish.tr.age.years")], by = "scientific_name") %>% 
+#   dplyr::mutate(new.diet_trophic.level_num = dplyr::coalesce(diet_trophic.level_num, fish.tr.trophic.level.num),
+#                 new.age_life.span_years = dplyr::coalesce(age_life.span_years, fish.tr.age.years)) %>% 
+#   dplyr::distinct()
   
 
 ## TO REMOVE ONCE TRAIT DATA IS UPDATED - END 
 ## And next line of code program_sp_trt_data2  -> program_sp_trt_data AND call none "new" columns
 
 
-
+#### old exploration of fecundity vs offspring
 # determine whether fecundity or offspring number is best reproductive variable per project
 # xtabs(~project, program_sp_trt_data[which(program_sp_trt_data$reproduction_fecundity_num>0),])
 # 
@@ -419,6 +408,9 @@ program_sp_trt_data2 <- program_sp_trt_data %>%
 # for Birds -> use num.offspring
 # for Zooplankton -> us XXXXXXXXX
 
+
+
+
 # 4 - z-score standardize  =========================
 
 # note on nomenclature:
@@ -439,9 +431,9 @@ BAD <- c("KONZA","PIE","KBS_INS","MOHONK", "KBS_MAM", "KBS_BIR", "KBS_AMP")
 # rename and z-score standardize #CM: 11/03/26 no class column included
 all_traits <- program_sp_trt_data2 %>% filter(!project %in% BAD) %>%
   dplyr::select(c("project","habitat","taxon", "scientific_name","kingdom","class", "order","family","genus","sp.proj","source","raw_filename",
-                  "tr.age.years"="new.age_life.span_years",
+                  "tr.age.years"="age_life.span_years",
                   "length_max_cm", # CM: I have changed from length_adult_cm which only had NAs for fish - here and following code
-                  "tr.trophic.level.num" = "new.diet_trophic.level_num",
+                  "tr.trophic.level.num" = "diet_trophic.level_num",
                   "reproduction_reproductive.rate_num.offspring.per.year",
                   "reproduction_fecundity_num",
                   "tr.mass.adult.g" = "mass_adult_g")) %>%
@@ -604,7 +596,8 @@ for(i in 1:length(unique(all_traits$project))){
 
 ## 6 - Save cleaned trait data ===================
 # created new RDS without duplicates caused by many-to-one mapping with imputed traits -LDLA 3.18.26
-# currently produces df with 2797 rows
+# currently produces df with 2797 rows - early March
+# March 24 after cleaning all duplicated species across sites: 1861 spp
 saveRDS(all_traits,
         file.path("transformed_data",
                   "sp_tr_zscore_new_cleandups.rds"))
