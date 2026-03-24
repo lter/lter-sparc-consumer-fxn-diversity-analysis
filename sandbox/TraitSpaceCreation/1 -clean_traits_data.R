@@ -39,6 +39,8 @@ spp_master <- readr::read_csv(file.path("Data","species_tidy-data", "23_species_
 
 
 
+
+
 # 2 - Cleaning non-focal taxa  =========================
 
 
@@ -160,8 +162,46 @@ acceptable <- removed |>
 ## Make a clean spp list 
 sp_list <- rbind(dt1, acceptable)
 
+# change NAs to be blanks
+sp_list_v2 <- sp_list %>%
+  dplyr::mutate(across(everything(), na_if, y = ""))
 
-# 3 - final random cleaning =========================
+# make a species.project column to keep track of species that occur in multiple projects
+sp_list_v2$sp.proj <- paste(sp_list_v2$scientific_name, sp_list_v2$project, sep=".")
+
+# remove duplicated species per project (came from multiple source files)
+sp_list_v3 <- sp_list_v2 %>% distinct(sp.proj, .keep_all = T)
+
+# save a list of the duplicate species that we'll remove for z-scoring and trait space
+# *this would only be important if we do trait space-by-site analyses!
+sp_list_unique <- sp_list_v3 %>% distinct(scientific_name, .keep_all=T)
+
+sp_common <- names(xtabs(~scientific_name, sp_list_v3)[which(xtabs(~scientific_name, sp_list_v3)>1)])
+# 524 species have more than 1 entry
+# 182 speices have more than 2 entries
+# 110 have >3 entries
+# 54 have >4
+# 28 have >5
+# 12 have >6
+# 6 have 8
+
+### . remove bad sites/taxa ====================
+
+
+BAD <- c("KONZA","PIE","KBS_INS","MOHONK", "KBS_MAM", "KBS_BIR", "KBS_AMP")
+sp_tr_df1 <- program_sp_trt_data %>% 
+  dplyr::select(c("project","habitat","taxon", "scientific_name","kingdom","class", "order","family","genus","sp.proj","source","raw_filename",
+                  "tr.age.years"="age_life.span_years",
+                  "length_max_cm",
+                  "tr.trophic.level.num" = "diet_trophic.level_num",
+                  "reproduction_reproductive.rate_num.offspring.per.year",
+                  "reproduction_fecundity_num",
+                  "tr.mass.adult.g" = "mass_adult_g")) %>% 
+  dplyr::filter(taxon %in% c("Birds", "Zooplankton", "Fish")) %>% 
+  dplyr::filter(!project %in% BAD)
+
+
+# 3 - Traits Cleaning =========================
 
 ######## TRAITS: dropping/averaging duplicate imp_tr_df ######
 # MANY species have multiple entries
@@ -209,17 +249,6 @@ imp_tr_df_cl <- imp_tr_df[which(imp_tr_df$scientific_name!=""),] %>% group_by(sc
                                                                       reproduction_reproductive.rate_num.offspring.per.clutch.or.litter = mean_na_safe(reproduction_reproductive.rate_num.offspring.per.clutch.or.litter),
                                                                       reproduction_fecundity_num = mean_na_safe(reproduction_fecundity_num),
                                                                       mass_adult_g = mean_na_safe(mass_adult_g))
-
-# change NAs to be blanks
-sp_list_v2 <- sp_list %>%
-  dplyr::mutate(across(everything(), na_if, y = ""))
-
-# make a species.project column to keep species that occur in multiple projects
-sp_list_v2$sp.proj <- paste(sp_list_v2$scientific_name, sp_list_v2$project, sep=".")
-
-# remove duplicated species per project (came from multiple source files)
-sp_list_ready <- sp_list_v2 %>% distinct(sp.proj, .keep_all = T)
-
 
 
 # ## add in a taxa column
