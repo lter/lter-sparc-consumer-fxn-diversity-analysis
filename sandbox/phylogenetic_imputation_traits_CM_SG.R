@@ -260,7 +260,7 @@ sp_tr_fish_phylo$scientific_name <- gsub(" ", "_", sp_tr_fish_phylo$scientific_n
 sp_tr_fish_phylo2 <- tibble::column_to_rownames(sp_tr_fish_phylo,
                                                 "scientific_name")
 
-# Restrict the traits data to the one with datat for each trait:
+# Restrict the traits data to the one with data for each trait:
 trophic_level_tr <- sp_tr_fish_phylo2$tr.trophic.level.num[!is.na(sp_tr_fish_phylo2$tr.trophic.level.num)]
 names(trophic_level_tr) <- rownames(sp_tr_fish_phylo2[!is.na(sp_tr_fish_phylo2$tr.trophic.level.num), ])
 
@@ -284,4 +284,103 @@ try_mass <- picante::phyEstimate(phy = fishtree_complete[[1]],
 
 
 
-# (to code later 1000 draws for the 100 trees):
+# Compute mean and variance over the 100 trees 
+
+## Define a fct to do so:
+impute.trait <- function(fishtree,
+                         traits,
+                         trait_name) {
+  
+  # Final dataset:
+  imputed_df <- as.data.frame(matrix(ncol = 7, nrow = 1, NA))
+  colnames(imputed_df) <- c("species", "trait", "tree", "est", "se",
+                            "mean", "var")
+  
+  # Loop on each tree:
+  for (i in c(1:length(fishtree))) {
+    
+    print(i)
+    
+    # Get imputed values:
+    imp_tr <- picante::phyEstimate(phy = fishtree[[i]],
+                                   trait = traits,
+                                   method = "pic")
+    
+    # Build a dataframe:
+    imputed_tree_df <- imp_tr %>% 
+      tibble::rownames_to_column(var = "species") %>% 
+      dplyr::mutate(trait = rep(trait_name, nrow(imp_tr))) %>% 
+      dplyr::mutate(tree = rep(paste0("tree", sep = "_", i), nrow(imp_tr))) %>% 
+      dplyr::rename(est = estimate) %>% 
+      dplyr::mutate(mean = rep(NA, nrow(imp_tr)),
+                    var = rep(NA, nrow(imp_tr))) %>% 
+      dplyr::select( c("species", "trait", "tree", "est", "se",
+                       "mean", "var"))
+    
+    # Add it to the final one:
+    imputed_df <- rbind(imputed_df,
+                        imputed_tree_df)
+
+  }
+  
+  # Compute the mean and var for each species:
+  imputed_final_df <- imputed_df %>% 
+    dplyr::group_by(species) %>% 
+    dplyr::mutate(mean = mean(est, na.rm = TRUE),
+                  var  = stats::sd(est, na.rm = TRUE)) %>% 
+    dplyr::ungroup()
+  
+  # Remove the first row:
+  imputed_final_df <- imputed_final_df[-1, ]
+  
+  return(imputed_final_df)
+
+}
+
+## Impute trait for body mass:
+imp_tr_mass_df <- impute.trait(fishtree = fishtree_complete,
+                               traits = mass_tr,
+                               trait_name = "imp.tr.mass.adult.g")
+
+## Impute trait for reproduction:
+imp_tr_reprod_df <- impute.trait(fishtree = fishtree_complete,
+                               traits = reprod_tr,
+                               trait_name = "imp.tr.reproduction.unified")
+
+## Impute trait for trophic level:
+imp_tr_TL_df <- impute.trait(fishtree = fishtree_complete,
+                               traits = trophic_level_tr,
+                               trait_name = "imp.tr.trophic.level.num")
+
+## Impute trait for lifespan:
+imp_tr_LS_df <- impute.trait(fishtree = fishtree_complete,
+                               traits = lifespan_tr,
+                               trait_name = "imp.new.tr.age.years")
+
+
+## Bind all imputed traits together:
+imputed_tr_all_df <- rbind(imp_tr_mass_df,
+                           imp_tr_reprod_df,
+                           imp_tr_TL_df,
+                           imp_tr_LS_df)
+saveRDS(imputed_tr_all_df,
+        here::here("transformed_data",
+                   "phylo_imputed_traits_df.rds"))
+
+
+# 7 - Phylogenetic imputation Fish - Step 3: Check extreme values ==============
+
+
+imputed_tr_all_df <- readRDS(here::here("transformed_data",
+                                         "phylo_imputed_traits_df.rds"))
+
+# Get species with extreme trait values:
+extreme_sp_df <- imputed_tr_all_df %>%
+  dplyr::group_by(trait) %>%
+  dplyr::mutate(q01 = stats::quantile(mean, 0.01),
+                q99 = stats::quantile(mean, 0.99)) %>%
+  dplyr::filter(mean <= q01 | mean >= q99) %>%
+  dplyr::select(species, trait, mean) %>%
+  dplyr::mutate(mean = round(mean, 3)) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::distinct()
