@@ -28,7 +28,7 @@ rm(list = ls()); gc()
 # 1 - Load data ================================================================
 
 
-# Traits data (not imputed - raw): @SHALANDA/ Should I use -copy or not copy?
+# Traits data (not imputed - raw): @SHALANDA/ Should I use -copy or not copy? SG- @CAMILLW you can use -copy. Most updated for now
 raw_sp_tr_df <- read.csv(file.path("Data", "traits_tidy-data", "12_traits_wrangled.csv"))
 
 # Call the sp dataset
