@@ -461,8 +461,20 @@ date_count <- hja4 %>%
 
 #### Hubbard Brook LTER ####
 #nightmare
+#need to look at this site more closely and make sure I am using the right data. 
 
 hubbardbrook_abundance <- read.csv(file = file.path("data", "terrestrial_community_raw-data", "HubbardBrook_Bird_MainPlot_1969-2018.csv"))
+
+#need to pivot longer
+
+hubbardbrook_abundance_LONG <- hubbardbrook_abundance %>%
+  pivot_longer(
+    cols = -BirdSpecies,
+    names_to = "year",
+    values_to = "abundance",
+  )
+  mutate(abundance = replace_na(abundance, 0)) %>%
+  mutate(distance = "GT25")
 
 hubbardbrook_abundance_birdlist <- hubbardbrook_abundance %>%
   select(BirdSpecies)
