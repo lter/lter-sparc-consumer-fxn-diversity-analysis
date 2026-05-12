@@ -392,7 +392,11 @@ luquillo_abundance_EL_all_wrangled_step1 %>%
 #double check with kyle about the correct birds to include. he suggested to only do seagulls and gulls. BUT 108 species in full data set  & 42 taxon types. ~6 taxon types are NOT birds (humans, dogs, etc.)
 #But many are birds. Need to see how this compares with other data sets and which birds we are including...
 
-sbc_abundance <- read.csv(file = file.path("data", "terrestrial_community_raw-data", "Shorebird_count_20231020.csv"))
+#THERE IS A NEW FILE 
+sbc_abundance <- read.csv(file = file.path("data", "terrestrial_community_raw-data", "Shorebird_count_20260324.csv"))
+
+#old
+#sbc_abundance <- read.csv(file = file.path("data", "terrestrial_community_raw-data", "Shorebird_count_20231020.csv"))
 
 colnames(sbc_abundance)
 unique(sbc_abundance$TAXON_GROUP)
@@ -405,6 +409,7 @@ sbc_abundance %>%
   filter(TAXON_SPECIES == ".")
 #kyle recommended shorebird and gull and probably need ".", since . = NO BIRDS. 
 
+unique(sbc_abundance$YEAR) #through2023 now 
 
 sbc_birds <- sbc_abundance %>%
   filter(TAXON_CLASS != "Mammalia") %>%
@@ -692,11 +697,26 @@ hubbardbrook_abundance_birdlist_taxo_final <- hubbardbrook_abundance_birdlist_ta
 #### CAP ####
 
 cap_main <- read.csv(file = file.path("data", "terrestrial_community_raw-data", "cap", "46_bird_observations.csv"))
+cap_main_sites <-  read.csv(file = file.path("data", "terrestrial_community_raw-data", "cap", "46_bird_survey_locations.csv"))
 cap_saltriver <- read.csv(file = file.path("data", "terrestrial_community_raw-data", "cap", "641_bird_observations.csv"))
 
+cap_main_sites_limited <- cap_main_sites %>%
+  select(site_code, location_type) %>%
+  distinct()
 
 cap_main_commonnames <- cap_main %>%
   distinct(common_name) 
+
+cap_main_withsiteinfo <- cap_main %>%
+  left_join(cap_main_sites_limited, by = "site_code")
+
+test <- cap_main_withsiteinfo %>%
+  group_by(location_type, site_code, survey_date) %>%
+  count(n = n())
+
+
+unique(cap_main$site_code) #106 site codes
+
 #310
 #212
 
