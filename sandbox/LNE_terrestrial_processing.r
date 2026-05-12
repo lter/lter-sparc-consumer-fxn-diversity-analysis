@@ -44,6 +44,13 @@ glimpse(luquillo_abundance_EL_GT25)
 unique(luquillo_abundance_EL_GT25$PLOT1) #"A"  "C"  "E"  "G"  "I"  "K"  "3"  "6"  "9"  "12" "15"
 unique(luquillo_abundance_EL_GT25$PLOT2) #  1  3  5  7  9 11 10  8  6  4  2 12 15 18 21 24
 colnames(luquillo_abundance_EL_LT25) #2 plots
+unique(luquillo_abundance_EL_LT25$PLACE)
+
+#investigating if all of the entries have a date... I think they do?
+unique(luquillo_abundance_EL_GT25$DATE)
+unique(luquillo_abundance_EL_LT25$DATE)
+unique(luquillo_abundance_EL_GT25$JULIAN)
+unique(luquillo_abundance_EL_LT25$JULIAN)
 
 luquillo_birdcode <- read.csv(file = file.path("data", "terrestrial_community_raw-data", "Luquillo_BirdDataCodes.csv"))
 
@@ -64,7 +71,8 @@ luquillo_abundance_EL_GT25 %>%
 # I - 1989 and 1990
 # K - 1989 and 1990
 
-#okay, going to ignore first 2 years, they were sampled differently. 
+#okay, going to ignore first 2 years, they were sampled differently. we will filter out the first years of sampling so only have plots 
+#with numbers, and no letters. 
 
 luquillo_abundance_EL_GT25 %>%
   filter(PLOT1 == "C") %>%
@@ -92,23 +100,154 @@ unique(luquillo_abundance_BW_LT25$YEAR) #1989-1991 only...
 #going to remove the first 2 years because sampling seems inconsistent...
 #also removing 1991 because it is werid sampling dates as well 
 
+# SPOT CHECKING FOR CERTAIN SPECIES 
+luquillo_abundance_EL_GT25 %>%
+  select(WATTH) %>%
+  distinct()
+
+luquillo_abundance_EL_GT25 %>%
+  filter(BTBLW == 1)
+
+luquillo_abundance_EL_LT25 %>%
+  select(WATTH) %>%
+  distinct()
+
+luquillo_abundance_EL_LT25 %>%
+  filter(WATTH == 1)
+
+#BFGRQ = ALL NA  
+# BLAWA = LT25, 1992 in J 335 only 
+# BTBLW = GT25 & LT25, many times, 1990 and 1991, outside of our Julian date range
+# BTGNW = LT25, 1 occurrence, 1991, outside of julian date range
+# BWWAR = LT 25 1989-1993, many times,  outside of julian date range
+# GNHER = LT25, 1 occurrence, 1993, outside of julian date range
+#HOWAR = LT25, 1 occurrence, 2018, outside of julian date range
+# KENWA = LT25, 2 occurrence, 1990, outside of julian date range
+# MAGWA = LT25, 1 occurance, 1991, outside of julian date range
+#NOWAT = LT25, 1991 and 1993, in J 63 and 318 only
+
+#WATTH = LT25,, 2 occurances, 1990 and 1992, outside of julian date range
+    
+  distinct()
+
+luquillo_abundance_EL_GT25 %>%
+  filter(!YEAR %in% c(1989, 1990)) %>%
+  group_by(YEAR, PLOT1) %>%
+  count(PLOT2) %>%
+  filter(n>1) %>%
+  distinct(YEAR)
+
+unique(luquillo_abundance_EL_GT25$PLOT2)
+
+test1 <-luquillo_abundance_EL_GT25 %>%
+  filter(YEAR==1991) %>%
+  filter(PLOT1 == 12) %>%
+  filter(PLOT2 == 18)
+  
+#1174 all together
+#161 -- more than 1 
+
+#also 1991, didn't spot check but think same thing... 
+#1992 --> spot checked only: did one sampling in 1992-03-06 (133) and another in 1992-30-11 (335), so filtering should fix this 
+#1993 --> spot checked:(3,6) = 62 and 169; (6,15) = 62,139
+#1994 --> spot checked:(12,24) = 66 and 132; (3,3) = 59, 129
+#2012 (1) --> did plot 1 15, plot 2 12 --> twice
+#2018  --> spot checked:(12,24) = 22,149; (6,18) =22,150
+
+luquillo_abundance_EL_GT25 %>%
+  filter(YEAR == 1996) %>%
+  distinct(JULIAN)
+
+#1992 - 150, 294
+#1991 - 175 - 200, 211 
+#1993 max 139 
+#1995 -- 139, 144, 155 ONLY 
+#1996  -- only 204 
+
+
+
 # gt25 = greater than 25 m
 # lt25 = less than 25 m
 # combining them for now, can filter later. 
 luquillo_abundance_EL_GT25_sub <- luquillo_abundance_EL_GT25 %>%
-  filter(!YEAR %in% c(1989, 1990, 1991), 
-         dplyr::between(JULIAN, 121, 182)) %>%
+  filter(!YEAR %in% c(1989, 1990), 
+         dplyr::between(JULIAN, 121, 212)) %>% #okay in some years they surveyed twice, so trying to condense to one sample per year 
+  #need to keep to 212 to include 1996 and 1991 
   select(-c(WEATHER, WIND, RAIN, TIME, JULIAN, OBSERVER))
+
+unique(luquillo_abundance_EL_GT25_sub$YEAR)
+
+
+
+anti_join(luquillo_abundance_EL_GT25_sub,luquillo_abundance_EL_GT25_sub1)
+
+luquillo_abundance_EL_GT25_sub %>%
+  group_by(YEAR, PLOT1) %>%
+  count(PLOT2) %>%
+  filter(n>1) 
+
+#okay, cool --> only 2012, plot1 15, plot2 12 is a double now... 
+
+luquillo_abundance_EL_GT25_sub %>%
+  distinct(YEAR, PLOT1, PLOT2) %>%
+  mutate(sampled = TRUE) %>%
+  complete(YEAR, PLOT1, PLOT2, fill = list(sampled = FALSE)) %>%
+  filter(!sampled)
+
+#okay, so I think only 2012 15 24... this is the same plot1/year that has a double, so it is maybe a typo? 
+
+filtered_outGT <- anti_join(luquillo_abundance_EL_GT25, luquillo_abundance_EL_GT25_sub)
+filtered_outLT <- anti_join(luquillo_abundance_EL_LT25, luquillo_abundance_EL_LT25_sub)
+filtered_out_diff <- anti_join(filtered_outGT,filtered_outLT, by = c("YEAR", "PLOT1", "PLOT2"))
 
 unique(luquillo_abundance_EL_GT25_sub$YEAR) #nice 
 
+unique(luquillo_abundance_EL_GT25_sub$PLOT1) #okay, all plots are numbers now, this is better I think
+
 luquillo_abundance_EL_GT25_sub %>%
   filter(YEAR == "1992") %>%
-  distinct(DATE, PLOT1)
+  distinct(DATE, PLOT1, PLOT2)
+
+#okay, now do for LT 25 
+
+test <- luquillo_abundance_EL_LT25 %>%
+  filter(!YEAR %in% c(1989, 1990, 1991),  #filtering these out because different sampling method
+         dplyr::between(JULIAN, 121, 212)) %>%
+  group_by(YEAR, PLOT1) %>%
+  count(PLOT2) %>%
+  filter(n>1)
 
 luquillo_abundance_EL_LT25_sub <- luquillo_abundance_EL_LT25 %>%
-  filter(!YEAR %in% c(1989, 1990)) %>%
+  filter(!YEAR %in% c(1989, 1990),
+         dplyr::between(JULIAN, 121, 211)) %>%
   select(-c(WEATHER, WIND, RAIN, TIME, JULIAN, OBSERVER))
+
+#nice, each have 1215 
+#same plot with issue... 
+luquillo_abundance_EL_LT25_sub %>%
+  group_by(YEAR, PLOT1) %>%
+  count(PLOT2) %>%
+  filter(n>1) 
+
+luquillo_abundance_EL_GT25 %>%
+  filter(YEAR == 2003,
+         PLOT1 == 6,
+         PLOT2 == 24)
+
+
+#julian = 163 for LT
+#julian = 163 for GT
+
+
+
+test4 <- luquillo_abundance_EL_LT25_sub %>%
+  distinct(YEAR, PLOT1, PLOT2) %>%
+  mutate(sampled = TRUE) %>%
+  complete(YEAR, PLOT1, PLOT2, fill = list(sampled = FALSE)) %>%
+  filter(!sampled)
+
+#same 26 obs as GT :) 
+
 
 unique(luquillo_abundance_EL_LT25_sub$YEAR) #nice
 
@@ -122,6 +261,8 @@ id_cols <- c("YEAR", "PLOT1", "PLOT2", "DATE", "PLACE")   # add others you have 
 #filter(YEAR == "2012") %>%
 #filter(PLOT1 == "12")
 
+#1160 for EL GT25 VS 
+
 luquillo_abundance_EL_GT25_LONG <- luquillo_abundance_EL_GT25_sub %>%
   pivot_longer(
     cols = -all_of(id_cols),
@@ -132,6 +273,7 @@ luquillo_abundance_EL_GT25_LONG <- luquillo_abundance_EL_GT25_sub %>%
   mutate(distance = "GT25")
 
 glimpse(luquillo_abundance_EL_GT25_LONG)
+unique(luquillo_abundance_EL_GT25_LONG$DATE)
 
 luquillo_abundance_EL_LT25_LONG <- luquillo_abundance_EL_LT25_sub %>%
   pivot_longer(
@@ -142,23 +284,44 @@ luquillo_abundance_EL_LT25_LONG <- luquillo_abundance_EL_LT25_sub %>%
   mutate(abundance = replace_na(abundance, 0)) %>%
   mutate(distance = "LT25")
 
+unique(luquillo_abundance_EL_LT25_sub$DATE)
 
 luquillo_abundance_EL_all_LONG <- rbind(luquillo_abundance_EL_GT25_LONG, luquillo_abundance_EL_LT25_LONG)
 #this is a LOT of observations, but I think ok?
 
+
+
+
+
+
+
+luquillo_abundance_EL_all_LONG %>%
+  filter(YEAR == 2003,
+         PLOT1 == 6,
+         PLOT2 == 24) %>%
+  filter(species_code == "WWDOV")
+
+unique(luquillo_abundance_EL_all_LONG$species_code)
+
+#### do this 
 #get species list so can get correct taxonomic names attached... 
 luquillo_abundance_EL_all_LONG_above0 <- luquillo_abundance_EL_all_LONG %>%
   dplyr::filter(abundance > 0) %>%
   distinct(species_code) 
 
-luquillo_abundance_EL_all_LONG_all<- luquillo_abundance_EL_all_LONG %>%
+luquillo_abundance_EL_all_LONG_speciescode <- luquillo_abundance_EL_all_LONG %>%
   distinct(species_code) 
 
-setdiff(luquillo_abundance_EL_all_LONG_all$species_code, luquillo_abundance_EL_all_LONG_above0$species_code)
-# "BFGRQ" "KENWA" "PRAIW" "WEVIR" "YFGRQ" --> never appear? 
+setdiff(luquillo_abundance_EL_all_LONG_speciescode$species_code, luquillo_abundance_EL_all_LONG_above0$species_code)
+# OLD LIST:  "BFGRQ" "KENWA" "PRAIW" "WEVIR" "YFGRQ" --> never appear? 
+#NEW LIST (May 11 2026)
+#[1] "BFGRQ" "BLAWA" "BTBLW" "BTGNW" "BWWAR" "GNHER" "HOWAR" "KENWA" "MAGWA" "NOWAT" "PARUW" "PRAIW" "WATTH" "WEVIR"
+#[15] "YFGRQ" "YTWAR"
 
 luquillo_abundance_EL_all_LONG_all_specieslist <- luquillo_abundance_EL_all_LONG_all %>%
   filter(!species_code %in% c("UNKNO","UNWAR", "WATTH", "TOTAL"))
+
+#removing these 4 because they are UKNOWN! 
 
 # ask Shalanda if okay to remove these 4 from list?
 
@@ -220,7 +383,6 @@ luquillo_abundance_EL_all_wrangled_step1 %>%
 #confirm with shalanda that we can remove these. 
 
 #would write this out for next step in the workflow. 
-
 
 
 
