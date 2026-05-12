@@ -386,7 +386,7 @@ luquillo_abundance_EL_all_wrangled_step1 %>%
 
 
 
-#### SBC ####
+#### SBC LTER ####
 # this DATA HAS DEAD ANIMALS IN IT. and humans.... 
 
 #double check with kyle about the correct birds to include. he suggested to only do seagulls and gulls. BUT 108 species in full data set  & 42 taxon types. ~6 taxon types are NOT birds (humans, dogs, etc.)
@@ -398,15 +398,32 @@ colnames(sbc_abundance)
 unique(sbc_abundance$TAXON_GROUP)
 unique(sbc_abundance$TAXON_SPECIES)
 #42 taxon types
+unique(sbc_abundance$TAXON_CLASS)
+#"Aves"     "Mammalia" "."        NA    
 
 sbc_abundance %>%
   filter(TAXON_SPECIES == ".")
 #kyle recommended shorebird and gull and probably need ".", since . = NO BIRDS. 
 
-sbc_shorbird <- sbc_abundance %>%
+
+sbc_birds <- sbc_abundance %>%
+  filter(TAXON_CLASS != "Mammalia") %>%
+  filter(TAXON_SPECIES == ".") %>%
+  filter(TOTAL > 0)
+
+#only 4 instances of no birds
+#  YEAR MONTH       DATE SITE COMMON_NAME TOTAL TAXON_GENUS TAXON_SPECIES TAXON_GROUP SURVEY TAXON_KINGDOM
+#1 2017    10 10/21/2017  AQB    NO BIRDS     1           .             .           .      .             .
+#2 2021     9  9/20/2021 IVWB    NO BIRDS     1           .             .           .      .             .
+#3 2021    11 11/17/2021 EUCB    NO BIRDS     1           .             .           .      .             .
+#4 2022     9  9/27/2022  ABB    NO BIRDS     1     
+  
+#what kyle recommended, should look into! 
   filter(TAXON_GROUP %in% c("shorebird", "gull"))
 
 unique(sbc_shorbird$TAXON_SPECIES)
+
+
 
 
 #### Andrews Experimental ####
