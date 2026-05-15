@@ -29,7 +29,7 @@ rm(list = ls()); gc()
 
 
 # Traits data (not imputed - raw): @SHALANDA/ Should I use -copy or not copy? SG- @CAMILLW you can use -copy. Most updated for now
-raw_sp_tr_df <- read.csv(file.path("Data", "traits_tidy-data", "12_traits_wrangled.csv"))
+raw_sp_tr_df <- read.csv(file.path("Data", "traits_tidy-data", "12_traits_wrangled-copy.csv"))
 
 # Call the sp dataset
 spp_master <- readr::read_csv(file.path("Data","species_tidy-data", "23_species_master-spp-list-copy.csv")) |>
@@ -384,3 +384,66 @@ extreme_sp_df <- imputed_tr_all_df %>%
   dplyr::mutate(mean = round(mean, 3)) %>% 
   dplyr::ungroup() %>% 
   dplyr::distinct()
+
+# Trait values have been checked by Chris and Matt (https://docs.google.com/spreadsheets/d/1kb5kNx5gSZWMccCA9Vpl2kyG2G1HFMNkNw2Lb85ghMo/edit?gid=0#gid=0):
+# Based on their assessment, some extreme traits values are wrong -> set to NA:
+
+imputed_tr_all_corrected_df <- imputed_tr_all_df %>%
+  dplyr::group_by(trait) %>%
+  dplyr::select(species, trait, mean) %>%
+  dplyr::mutate(mean = round(mean, 3)) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::distinct()
+
+# Correct extreme values for body mass:
+sp_to_change_mass <- c("Sillaginodes_punctatus",
+                  "Pentaceropsis_recurvirostris",
+                  "Dinolestes_lewini")
+imputed_tr_all_corrected_df$mean[which(imputed_tr_all_corrected_df$species %in% sp_to_change_mass &
+                                         imputed_tr_all_corrected_df$trait == "imp.tr.mass.adult.g")] <- NA
+
+# Correct extreme values for reproduction:
+sp_to_change_reprod <- extreme_sp_df$species[which(extreme_sp_df$trait == "imp.tr.reproduction.unified")]
+imputed_tr_all_corrected_df$mean[which(imputed_tr_all_corrected_df$species %in% sp_to_change_reprod &
+                                         imputed_tr_all_corrected_df$trait == "imp.tr.reproduction.unified")] <- NA
+
+# Correct extreme values for life span:
+sp_to_change_lifespan <- c("Pseudocaranx_wrighti",
+                           "Latridopsis_forsteri",
+                           "Mendosoma_lineatum",
+                           "Dactylophora_nigricans")
+imputed_tr_all_corrected_df$mean[which(imputed_tr_all_corrected_df$species %in% sp_to_change_lifespan &
+                                         imputed_tr_all_corrected_df$trait == "imp.new.tr.age.years")] <- NA
+
+
+# How many unique values are imputed for how many species?
+## Reproduction - ONLY 25% of the species have different trait values:
+(length(unique(imputed_tr_all_corrected_df$mean[which(imputed_tr_all_corrected_df$trait == "imp.tr.reproduction.unified")]))/nrow(imputed_tr_all_corrected_df[which(imputed_tr_all_corrected_df$trait == "imp.tr.reproduction.unified"), ]))*100
+## Lifespan - 58% of the species have different trait values:
+(length(unique(imputed_tr_all_corrected_df$mean[which(imputed_tr_all_corrected_df$trait == "imp.new.tr.age.years")]))/nrow(imputed_tr_all_corrected_df[which(imputed_tr_all_corrected_df$trait == "imp.new.tr.age.years"), ]))*100
+## Mass - 77% of the species have different trait values:
+(length(unique(imputed_tr_all_corrected_df$mean[which(imputed_tr_all_corrected_df$trait == "imp.tr.mass.adult.g")]))/nrow(imputed_tr_all_corrected_df[which(imputed_tr_all_corrected_df$trait == "imp.tr.mass.adult.g"), ]))*100
+## Trophic level - all species (14) have different trait values:
+(length(unique(imputed_tr_all_corrected_df$mean[which(imputed_tr_all_corrected_df$trait == "imp.tr.trophic.level.num")]))/nrow(imputed_tr_all_corrected_df[which(imputed_tr_all_corrected_df$trait == "imp.tr.trophic.level.num"), ]))*100
+
+
+# Note on Reproduction trait: all extreme trait values for the reproduction 
+# ... unified trait seem off + only few values imputed (because few values on 
+# ... which to rely for imputation): can we rely on the imputation for the
+# ... imputed values for this trait? 
+# ... @Shalanda I have explored more imputed values for this trait and
+# ... they tend to always be way too high, so i'm not sure we can rely on these
+# ... values, which is a problem because we tend to have a lot of NA for this
+# ... trait: are we sure we have included all the possible values from the 
+# ... existing databases? 
+
+
+# Note: Once new mass data: check mass extreme still after this step
+# ... because still weird values (ex: Solenostomus_cyanopterus - 10kg,
+# ... Bovichtus_angustifrons - 7kg, Platycephalus_bassensis
+# ... Platycephalus, Enoplosus_armatus) SO CHECK ONCE NEW DATA ! 
+# Same for age, some values seem weird - once we have final data before imputation,
+# ... re-run the analysis and check carefully 
+
+
+
