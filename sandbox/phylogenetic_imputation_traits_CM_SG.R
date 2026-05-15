@@ -426,6 +426,9 @@ imputed_tr_all_corrected_df$mean[which(imputed_tr_all_corrected_df$species %in% 
 ## Trophic level - all species (14) have different trait values:
 (length(unique(imputed_tr_all_corrected_df$mean[which(imputed_tr_all_corrected_df$trait == "imp.tr.trophic.level.num")]))/nrow(imputed_tr_all_corrected_df[which(imputed_tr_all_corrected_df$trait == "imp.tr.trophic.level.num"), ]))*100
 
+saveRDS(imputed_tr_all_corrected_df,
+        here::here("transformed_data",
+                   "phylo_imputed_traits_corrected_vers1_df.rds"))
 
 # Note on Reproduction trait: all extreme trait values for the reproduction 
 # ... unified trait seem off + only few values imputed (because few values on 
