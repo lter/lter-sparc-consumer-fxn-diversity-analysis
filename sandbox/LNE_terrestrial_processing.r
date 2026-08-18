@@ -433,6 +433,217 @@ unique(sbc_shorbird$TAXON_SPECIES)
 
 #### Andrews Experimental ####
 
+# updated August 18 2026
+
+#read in point-count data
+#2021-2025 data provided by Matt and Emily. will need to check in with them before publishing?
+bird21 <- readxl::read_excel("Data/terrestrial_community_raw-data/andrews_forest/SA02402_2021.xlsx")
+bird22 <- readxl::read_excel("Data/terrestrial_community_raw-data/andrews_forest/SA02402_2022.xlsx")
+bird23 <- readxl::read_excel("Data/terrestrial_community_raw-data/andrews_forest/SA02402_2023.xlsx")
+bird24 <- readxl::read_excel("Data/terrestrial_community_raw-data/andrews_forest/SA02402_2024.xlsx")
+bird25 <- readxl::read_excel("Data/terrestrial_community_raw-data/andrews_forest/SA02402_2025.xlsx")
+bird_09_20 <- read_csv("Data/terrestrial_community_raw-data/andrews_forest/SA02402_v4.csv") %>%
+  rename(SURVEY_DATETIME = SURVEY_DATE) %>%
+  filter(YEAR < 2021) #this was recommended by AND postdoc Emily Conklin
+
+unique(bird_09_20$YEAR)
+
+#bird_09_20 --. OG file
+
+#add dates for 2021 as these are missing
+bird_dates_21 <- read_csv("Data/terrestrial_community_raw-data/andrews_forest/SA02402_v4.csv") %>%
+  rename(SURVEY_DATETIME = SURVEY_DATE) %>%
+  filter(YEAR == 2021) %>% 
+  select(PLOT, REPLICATE, SURVEY_DATETIME) %>% unique()
+
+bird21 <- bird21 %>% select(-SURVEY_DATETIME) %>%
+  left_join(bird_dates_21 %>% mutate(REPLICATE = as.character(REPLICATE)) %>%
+              filter(!(SURVEY_DATETIME == "2021-05-21" & PLOT == "PA041")) %>%
+              filter(!(SURVEY_DATETIME == "2021-05-24" & PLOT == "PA279"))) %>%
+  mutate(SURVEY_DATETIME = as.character(SURVEY_DATETIME))
+
+bird_21_25 <- bind_rows(bird21, bird22, bird23, bird24, bird25) %>%
+  readr::type_convert()
+
+#combine and write to file
+all_bird <- bind_rows(bird_09_20, bird_21_25)
+
+write.csv(all_bird, "Data/terrestrial_community_raw-data/processed_data/bird_data_combined.csv")
+
+#get list of "rare singers" (pers. comm. Matt Betts)
+rare_song <- readxl::read_excel("Data/terrestrial_community_raw-data/andrews_forest/Species_with_rare_song.xlsx")
+
+names(rare_song) <- c("SPECIES", "RARE")
+rare_song <- rare_song %>%
+  bind_rows(data.frame(SPECIES = "RBSA", RARE = "x"))
+
+#For most species - use just songs -
+#SEX - M, DET_METH1 - S, DISTANCE - 1
+#NEW RECORD - 1
+#BCCH - no black capped chickadees!
+
+all_bird_m_song <- all_bird %>%
+  filter(NEW_RECORD == 1) %>% #remove repeat observations
+  left_join(rare_song) %>% 
+  filter(is.na(RARE)) %>%
+  filter(SEX == "M") %>% #use just males
+  filter(DET_METH1 == "S") %>% #use just songs
+  #filter(DISTANCE == 1) %>% #filter by distance - 50m
+  filter(DISTANCE <= 2) %>% #filter by distance - 100m
+  filter(!is.na(SURVEY_DATETIME)) %>%
+  mutate(SPECIES = if_else(SPECIES == "BCCH", "CBCH", SPECIES)) %>%
+  mutate(SPECIES = if_else(SPECIES == "PSFL", "WEFL", SPECIES)) %>%
+  select(-RARE)
+
+#just use males
+
+
+#for species that are dimorphic and don't sing, treat differently
+#DON'T filter by sex or detection method
+all_bird_dimorphic_nosong <- all_bird %>%
+  filter(NEW_RECORD == 1) %>% #remove repeat observations
+  left_join(rare_song) %>%
+  filter(!is.na(RARE)) %>%
+  #filter(DISTANCE == 1) %>% #filter by distance - 50m
+  filter(DISTANCE <= 2) %>% #filter by distance - 100m - we want to use 100 m :) 
+  filter(!is.na(SURVEY_DATETIME)) %>%
+  mutate(SPECIES = if_else(SPECIES == "BCCH", "CBCH", SPECIES)) %>% #collaspe across name changes?
+  mutate(SPECIES = if_else(SPECIES == "PSFL", "WEFL", SPECIES)) %>% #collaspe across name changes?
+  select(-RARE)
+
+#get warning, but I do think we expect multiple matches?
+
+all_bird_clean <- bind_rows(all_bird_m_song, all_bird_dimorphic_nosong)
+
+#write to file
+write.csv(all_bird_clean, "Data/terrestrial_community_raw-data/processed_data/bird_data_combined_filtered.csv")
+
+
+#next, we have different numbers of replicates per year
+#start by removing extra (>3) and lining up across dates
+ggplot(all_bird_clean) +
+  geom_point(aes(x = format(SURVEY_DATETIME, "%m-%d"), y = YEAR, color = REPLICATE))
+
+ggplot(all_bird_clean) +
+  geom_point(aes(x = YEAR, y = REPLICATE))
+
+#fix mislabeled replicates
+all_bird_clean <- all_bird_clean %>%
+  mutate(REPLICATE = if_else(YEAR == 2020, 1, REPLICATE))
+
+#not enough replicates - 2015, 2016, and 2020
+#too many replicates - 2009:2013, 2017, 2024
+#First, remove first and last replicate from 2009:2013 to line up dates
+#Next, remove additional replicates to get to 3 per year
+#discard replicates with the least plots sampled per year
+plots_per_rep <- all_bird %>% select(YEAR, REPLICATE, PLOT) %>% unique() %>%
+  group_by(YEAR, REPLICATE) %>% summarize(n_plot = n())
+
+#should be 184 plots per rep! 
+
+all_bird_clean_final <- all_bird_clean %>%
+  filter(!(YEAR %in% 2009:2013 & (REPLICATE == 1 | REPLICATE == 6))) %>%
+  filter(!(YEAR == 2022 & REPLICATE == 6)) %>%
+  filter(!(YEAR == 2024 & REPLICATE == 5)) %>%
+  filter(!(YEAR == 2009 & REPLICATE == 2)) %>%
+  filter(!(YEAR == 2010 & REPLICATE == 4)) %>%
+  filter(!(YEAR == 2011 & REPLICATE == 2)) %>%
+  filter(!(YEAR == 2012 & REPLICATE == 3)) %>%
+  filter(!(YEAR == 2013 & REPLICATE == 2)) %>%
+  filter(!(YEAR == 2017 & REPLICATE == 2)) %>%
+  filter(!(YEAR == 2024 & REPLICATE == 4))
+
+all_bird_clean_final_plot <- all_bird_clean %>%
+  mutate(cat = "retained") %>%
+  mutate(cat = if_else((YEAR %in% 2009:2013 & (REPLICATE == 1 | REPLICATE == 6)), "removed", cat)) %>%
+  mutate(cat = if_else((YEAR == 2022 & REPLICATE == 6), "removed", cat)) %>%
+  mutate(cat = if_else((YEAR == 2024 & REPLICATE == 5), "removed", cat)) %>%
+  mutate(cat = if_else((YEAR == 2009 & REPLICATE == 2), "removed", cat)) %>%
+  mutate(cat = if_else((YEAR == 2010 & REPLICATE == 4), "removed", cat)) %>%  
+  mutate(cat = if_else((YEAR == 2011 & REPLICATE == 2), "removed", cat)) %>% 
+  mutate(cat = if_else((YEAR == 2012 & REPLICATE == 3), "removed", cat)) %>%  
+  mutate(cat = if_else((YEAR == 2013 & REPLICATE == 2), "removed", cat)) %>%  
+  mutate(cat = if_else((YEAR == 2017 & REPLICATE == 2), "removed", cat)) %>%
+  mutate(cat = if_else((YEAR == 2024 & REPLICATE == 4), "removed", cat))
+
+ggplot(all_bird_clean_final_plot) +
+  geom_point(aes(x = format(SURVEY_DATETIME, "%m-%d"), y = YEAR, color = cat)) +
+  theme(legend.title = element_blank(),
+        axis.text.x = element_text(angle = 90, vjust = 0.5)) + xlab("DATE")
+
+all_bird_clean_final_plot %>%
+  filter(cat == "retained") %>%
+  group_by(YEAR) %>%
+  summarise(n = n_distinct(REPLICATE)) %>%
+  ggplot() +
+  geom_point(aes(x = YEAR, y = n))
+
+#sweet, now they all have 3 replicates except for 2015, 2016, and 2020
+
+all_bird_clean_final_test <- all_bird_clean %>%
+  filter(!(YEAR %in% 2009:2013 & (REPLICATE == 1 | REPLICATE == 6))) %>%
+  filter(!(YEAR == 2020 & REPLICATE == 2)) %>%
+  filter(!(YEAR == 2024 & (REPLICATE == 5))) %>%
+  filter(!(YEAR == 2017 & (REPLICATE == 1)))
+
+#test - RANDOMLY remove a replicate from 2009:2013, 2024
+#6 years, 4 replicates
+all_bird_rep_removal_test_1 <- all_bird_clean_final_test %>%
+  group_by(YEAR) %>% summarize(Abundance = n()) %>%
+  filter(!(YEAR %in% c(2009:2013, 2024, 2015, 2016, 2020))) 
+
+all_bird_rep_removal_test_2 <- all_bird_clean_final_test %>%
+  group_by(YEAR, REPLICATE) %>% summarize(n = n()) %>%
+  filter(YEAR %in% c(2009:2013, 2024)) %>%
+  ungroup() %>% mutate(REPLICATE = rep(1:4, times = 6))
+removal_combos <- gtools::permutations(n = 4, r = 6, repeats.allowed = TRUE)
+combos_out <- all_bird_rep_removal_test_2[0,] %>%
+  mutate(group = NA)
+
+for (i in 1:nrow(removal_combos)){
+  
+  rep_remove <- data.frame(REPLICATE = removal_combos[i,],
+                           YEAR = c(2009:2013, 2024))
+  
+  this_combo <- anti_join(all_bird_rep_removal_test_2, rep_remove) %>%
+    group_by(YEAR) %>% summarize(Abundance = sum(n)) %>%
+    mutate(group = i)
+  
+  combos_out <- bind_rows(combos_out, this_combo)
+  
+}
+
+#looks good!
+ggplot() +
+  geom_line(data = all_bird_rep_removal_test_1,
+            aes(x = YEAR, y = Abundance), linewidth = 1) +
+  geom_line(data = combos_out %>% filter(YEAR != 2024),
+            aes(x = YEAR, y = Abundance, group = group), 
+            linewidth = 0.1, color = "red")  
+
+#plot final replicates
+ggplot(all_bird_clean_final) +
+  geom_point(aes(x = format(SURVEY_DATETIME, "%m-%d"), y = YEAR, color = REPLICATE))
+
+
+
+bird_summarized <- all_bird_clean_final_test %>%
+  group_by(YEAR, REPLICATE, SPECIES, PLOT) %>%
+  summarize(ABUNDANCE = n())
+
+final_dataset_summarized <- bird_summarized %>%
+  group_by(YEAR, SPECIES) %>%
+  summarize(ABUNDANCE = sum(ABUNDANCE))
+
+final_dataset_occupancy <- bird_summarized %>%
+  group_by(YEAR, SPECIES, PLOT) %>%
+  summarize(PLOT_ABUNDANCE = sum(ABUNDANCE)) %>%
+  mutate(PLOT_OCCUPANCY = if_else(PLOT_ABUNDANCE > 0, 1, 0)) %>%
+  group_by(YEAR, SPECIES) %>%
+  summarize(OCCUPANCY = sum(PLOT_OCCUPANCY) / 184)
+
+
+### OLD 
 andrews_ex_abundance <- read.csv(file = file.path("data", "terrestrial_community_raw-data", "SA02402_v4.csv"))
 andrews_birdcodes <- read.csv(file = file.path("data", "terrestrial_community_raw-data", "AndrewsForest_BirdDataCodes.csv"))
 unique(andrews_ex_abundance$PLOT)
