@@ -625,9 +625,10 @@ ggplot() +
 ggplot(all_bird_clean_final) +
   geom_point(aes(x = format(SURVEY_DATETIME, "%m-%d"), y = YEAR, color = REPLICATE))
 
+#all_bird_clean_final_plot
+#all_bird_clean_final_test
 
-
-bird_summarized <- all_bird_clean_final_test %>%
+bird_summarized <- all_bird_clean_final_plot %>%
   group_by(YEAR, REPLICATE, SPECIES, PLOT) %>%
   summarize(ABUNDANCE = n())
 
